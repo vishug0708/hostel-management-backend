@@ -239,242 +239,147 @@ const getStudentById = async (req, res) => {
     }
 };
 
+
 // =====================================================
 // UPDATE STUDENT
 // =====================================================
 
-const updateStudent = (req, res) => {
-
-    const { id } = req.params;
-
-    const {
-        name,
-        email,
-        mobile,
-        parent_email,
-        college,
-        course,
-        hostel
-    } = req.body;
-
-
-    // =================================================
-    // VALIDATE ID
-    // =================================================
-
-    if (!id || isNaN(id)) {
-
-        return res.status(400).json({
-
-            success: false,
-
-            message: "Invalid student ID"
-
-        });
-
-    }
-
-
-    // =================================================
-    // REQUIRED FIELDS
-    // =================================================
-
-    if (
-        !name ||
-        !email ||
-        !mobile ||
-        !parent_email ||
-        !college ||
-        !course ||
-        !hostel
-    ) {
-
-        return res.status(400).json({
-
-            success: false,
-
-            message:
-                "Please fill all required fields"
-
-        });
-
-    }
-
-
-    // =================================================
-    // MOBILE VALIDATION
-    // =================================================
-
-    if (!/^[0-9]{10}$/.test(mobile)) {
-
-        return res.status(400).json({
-
-            success: false,
-
-            message:
-                "Mobile number must contain exactly 10 digits"
-
-        });
-
-    }
-
-
-    // =================================================
-    // EMAIL VALIDATION
-    // =================================================
-
-    const emailRegex =
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-
-    if (!emailRegex.test(email)) {
-
-        return res.status(400).json({
-
-            success: false,
-
-            message:
-                "Please enter a valid email address"
-
-        });
-
-    }
-
-
-    // =================================================
-    // CHECK EMAIL
-    // =================================================
-
-    const checkEmailSql = `
-        SELECT id
-        FROM students
-        WHERE email = ?
-        AND id != ?
-        LIMIT 1
-    `;
-
-
-    db.query(
-        checkEmailSql,
-        [email, id],
-        (checkErr, results) => {
-
-            if (checkErr) {
-
-                console.error(
-                    "Check Student Email Error:",
-                    checkErr
-                );
-
-                return res.status(500).json({
-
-                    success: false,
-
-                    message:
-                        "Database error"
-
-                });
-
-            }
-
-
-            if (results.length > 0) {
-
-                return res.status(409).json({
-
-                    success: false,
-
-                    message:
-                        "Another student already uses this email"
-
-                });
-
-            }
-
-
-            // =============================================
-            // UPDATE
-            // =============================================
-
-            const updateSql = `
-                UPDATE students
-                SET
-                    name = ?,
-                    email = ?,
-                    mobile = ?,
-                    parent_email = ?,
-                    college = ?,
-                    course = ?,
-                    hostel = ?
-                WHERE id = ?
-            `;
-
-
-            db.query(
-                updateSql,
-                [
-                    name,
-                    email,
-                    mobile,
-                    parent_email,
-                    college,
-                    course,
-                    hostel,
-                    id
-                ],
-                (updateErr, result) => {
-
-                    if (updateErr) {
-
-                        console.error(
-                            "Update Student Error:",
-                            updateErr
-                        );
-
-                        return res.status(500).json({
-
-                            success: false,
-
-                            message:
-                                "Failed to update student",
-
-                            error:
-                                updateErr.message
-
-                        });
-
-                    }
-
-
-                    if (result.affectedRows === 0) {
-
-                        return res.status(404).json({
-
-                            success: false,
-
-                            message:
-                                "Student not found"
-
-                        });
-
-                    }
-
-
-                    return res.status(200).json({
-
-                        success: true,
-
-                        message:
-                            "Student updated successfully"
-
-                    });
-
-                }
-            );
-
+const updateStudent = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!id || isNaN(id)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid student ID"
+            });
         }
-    );
 
+        const {
+            name,
+            email,
+            mobile,
+            parent_email,
+            college,
+            course,
+            hostel
+        } = req.body;
+
+        if (
+            !name ||
+            !email ||
+            !mobile ||
+            !parent_email ||
+            !college ||
+            !course ||
+            !hostel
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Please fill all required fields"
+            });
+        }
+
+        // =================================================
+        // MOBILE VALIDATION
+        // =================================================
+
+        if (!/^[0-9]{10}$/.test(mobile)) {
+            return res.status(400).json({
+                success: false,
+                message: "Mobile number must contain exactly 10 digits"
+            });
+        }
+
+        // =================================================
+        // EMAIL VALIDATION
+        // =================================================
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                success: false,
+                message: "Please enter a valid email address"
+            });
+        }
+
+        // =================================================
+        // CHECK DUPLICATE EMAIL
+        // =================================================
+
+        const checkEmailSql = `
+            SELECT id
+            FROM students
+            WHERE email = ?
+            AND id != ?
+            LIMIT 1
+        `;
+
+        const [existingStudents] = await db.query(
+            checkEmailSql,
+            [email, id]
+        );
+
+        if (existingStudents.length > 0) {
+            return res.status(409).json({
+                success: false,
+                message: "Another student already uses this email"
+            });
+        }
+
+        // =================================================
+        // UPDATE STUDENT
+        // =================================================
+
+        const updateSql = `
+            UPDATE students
+            SET
+                name = ?,
+                email = ?,
+                mobile = ?,
+                parent_email = ?,
+                college = ?,
+                course = ?,
+                hostel = ?
+            WHERE id = ?
+        `;
+
+        const [result] = await db.query(
+            updateSql,
+            [
+                name,
+                email,
+                mobile,
+                parent_email,
+                college,
+                course,
+                hostel,
+                id
+            ]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Student not found"
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Student updated successfully"
+        });
+
+    } catch (error) {
+        console.error("Update Student Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to update student",
+            error: error.message
+        });
+    }
 };
 
 // =====================================================

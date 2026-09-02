@@ -186,93 +186,58 @@ const getStudents = async (req, res) => {
 // GET STUDENT BY ID
 // =====================================================
 
-const getStudentById = (req, res) => {
+const getStudentById = async (req, res) => {
+    try {
+        const { id } = req.params;
 
-    const { id } = req.params;
+        if (!id || isNaN(id)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid student ID"
+            });
+        }
 
-    // Validate ID
-    if (!id || isNaN(id)) {
+        const sql = `
+            SELECT
+                id,
+                name,
+                email,
+                mobile,
+                parent_email,
+                college,
+                course,
+                hostel,
+                hostel_fee,
+                photo
+            FROM students
+            WHERE id = ?
+            LIMIT 1
+        `;
 
-        return res.status(400).json({
+        const [results] = await db.query(sql, [id]);
 
-            success: false,
+        if (results.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Student not found"
+            });
+        }
 
-            message: "Invalid student ID"
-
+        return res.status(200).json({
+            success: true,
+            student: results[0]
         });
 
+    } catch (error) {
+        console.error("Get Student By ID Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch student",
+            error: error.message
+        });
     }
-
-
-    const sql = `
-        SELECT
-            id,
-            name,
-            email,
-            mobile,
-            parent_email,
-            college,
-            course,
-            hostel,
-            hostel_fee,
-            photo
-        FROM students
-        WHERE id = ?
-        LIMIT 1
-    `;
-
-
-    db.query(
-        sql,
-        [id],
-        (err, results) => {
-
-            if (err) {
-
-                console.error(
-                    "Get Student By ID Error:",
-                    err
-                );
-
-                return res.status(500).json({
-
-                    success: false,
-
-                    message:
-                        "Failed to fetch student"
-
-                });
-
-            }
-
-
-            if (results.length === 0) {
-
-                return res.status(404).json({
-
-                    success: false,
-
-                    message:
-                        "Student not found"
-
-                });
-
-            }
-
-
-            return res.status(200).json({
-
-                success: true,
-
-                student: results[0]
-
-            });
-
-        }
-    );
-
 };
-
 
 // =====================================================
 // UPDATE STUDENT

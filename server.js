@@ -6,6 +6,10 @@ const path = require("path");
 
 const db = require("./config/database");
 
+// =====================================================
+// ADMIN PROTECTED ROUTES
+// =====================================================
+
 const adminAuthRoutes = require("./routes/adminAuthRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const adminStudentRoutes = require("./routes/adminStudentRoutes");
@@ -18,6 +22,11 @@ const adminCricketReportRoutes = require("./routes/adminCricketReportRoutes");
 const adminStaffRoutes = require("./routes/adminStaffRoutes");
 
 
+
+// =====================================================
+// RECTOR PROTECTED ROUTES
+// =====================================================
+
 const rectorRoutes = require("./routes/rectorRoutes");
 const rectorAuthRoutes = require("./routes/rectorAuthRoutes");
 const rectorRoomRoutes = require("./routes/rectorRoomRoutes");
@@ -26,14 +35,31 @@ const rectorRoomDeAllocationRoutes = require("./routes/rectorRoomDeAllocationRou
 const rectorGatePassRoutes = require("./routes/rectorGatePassRoutes");
 
 
+// =====================================================
+// STUDENT PROTECTED ROUTES
+// =====================================================
+
 const studentAuthRoutes = require("./routes/studentAuthRoutes");
 const studentRoutes = require("./routes/studentRoutes");
 const studentGatePassRoutes = require("./routes/studentGatePassRoutes");
 
 
+// =====================================================
+// STAFF PROTECTED ROUTES
+// =====================================================
+
+const staffAuthRoutes = require("./routes/staffAuthRoutes");
+const staffRoutes = require("./routes/staffRoutes");
+
+
+// =====================================================
+// SECURITY PROTECTED ROUTES
+// =====================================================
+
 const securityAuthRoutes = require("./routes/securityAuthRoutes");
 const securityRoutes = require("./routes/securityRoutes");
 const securityGatePassRoutes = require("./routes/securityGatePassRoutes");
+
 
 
 
@@ -163,7 +189,9 @@ app.use("/api/admin/staff", adminStaffRoutes);
 
 
 
-
+// =====================================================
+// RECTOR PROTECTED ROUTES
+// =====================================================
 
 
 app.use(
@@ -198,6 +226,10 @@ app.use(
 
 
 
+// =====================================================
+// STUDENT PROTECTED ROUTES
+// =====================================================
+
 app.use(
     "/api/student/auth",
     studentAuthRoutes
@@ -215,6 +247,18 @@ app.use(
 
 
 
+// =====================================================
+// STAFF PROTECTED ROUTES
+// =====================================================
+
+app.use("/api/staff/auth", staffAuthRoutes);
+
+app.use("/api/staff", staffRoutes);
+
+
+// =====================================================
+// SECURITY PROTECTED ROUTES
+// =====================================================
 
 app.use(
     "/api/security/auth",

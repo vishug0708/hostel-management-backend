@@ -4,278 +4,114 @@ const db = require("../config/database");
 // =====================================================
 // GET ADMIN PROFILE
 // =====================================================
-
 const getAdminProfile = async (req, res) => {
     try {
         const adminId = req.user.id;
-
         const sql = `
-            SELECT
-                id,
-                name,
-                email,
-                phone
+            SELECT id, name, email, phone, photo
             FROM admins
             WHERE id = ?
             LIMIT 1
         `;
-
         const [results] = await db.query(sql, [adminId]);
-
         if (results.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: "Admin not found"
-            });
+            return res.status(404).json({ success: false, message: "Admin not found" });
         }
-
-        const admin = results[0];
-
-        return res.status(200).json({
-            success: true,
-            admin: {
-                id: admin.id,
-                name: admin.name,
-                email: admin.email,
-                phone: admin.phone
-            }
-        });
-
+        return res.status(200).json({ success: true, admin: results[0] });
     } catch (error) {
         console.error("Admin Profile Database Error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Database error",
-            error: error.message
-        });
+        return res.status(500).json({ success: false, message: "Database error", error: error.message });
     }
 };
 
 // =====================================================
 // UPDATE ADMIN PROFILE
 // =====================================================
-
 const updateAdminProfile = async (req, res) => {
     try {
         const adminId = req.user.id;
-
-        const {
-            name,
-            email,
-            phone
-        } = req.body;
-
-        // =================================================
-        // VALIDATION
-        // =================================================
+        const { name, email, phone } = req.body;
 
         if (!name || !email || !phone) {
-            return res.status(400).json({
-                success: false,
-                message: "Name, email and phone are required"
-            });
+            return res.status(400).json({ success: false, message: "Name, email and phone are required" });
         }
 
-        // =================================================
-        // UPDATE PROFILE
-        // =================================================
+        const values = [name.trim(), email.trim(), phone.trim()];
+        let sql = `UPDATE admins SET name = ?, email = ?, phone = ?`;
 
-        const sql = `
-            UPDATE admins
-            SET
-                name = ?,
-                email = ?,
-                phone = ?
-            WHERE id = ?
-        `;
+        if (req.file) {
+            sql += `, photo = ?`;
+            values.push(`/uploads/admins/${req.file.filename}`);
+        }
 
-        const [result] = await db.query(
-            sql,
-            [
-                name.trim(),
-                email.trim(),
-                phone.trim(),
-                adminId
-            ]
-        );
+        sql += ` WHERE id = ?`;
+        values.push(adminId);
 
+        const [result] = await db.query(sql, values);
         if (result.affectedRows === 0) {
-            return res.status(404).json({
-                success: false,
-                message: "Admin not found"
-            });
+            return res.status(404).json({ success: false, message: "Admin not found" });
         }
+
+        const [rows] = await db.query(
+            `SELECT id, name, email, phone, photo FROM admins WHERE id = ? LIMIT 1`,
+            [adminId]
+        );
 
         return res.status(200).json({
             success: true,
-            message: "Admin profile updated successfully"
+            message: "Admin profile updated successfully",
+            admin: rows[0]
         });
-
     } catch (error) {
         console.error("Admin Profile Update Error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Database error",
-            error: error.message
-        });
+        return res.status(500).json({ success: false, message: "Database error", error: error.message });
     }
 };
 
 // =====================================================
 // CHANGE ADMIN PASSWORD
 // =====================================================
-
 const changeAdminPassword = async (req, res) => {
     try {
         const adminId = req.user.id;
+        const { currentPassword, newPassword, confirmPassword } = req.body;
 
-        const {
-            currentPassword,
-            newPassword,
-            confirmPassword
-        } = req.body;
-
-        // =================================================
-        // VALIDATION
-        // =================================================
-
-        if (
-            !currentPassword ||
-            !newPassword ||
-            !confirmPassword
-        ) {
-            return res.status(400).json({
-                success: false,
-                message: "All password fields are required"
-            });
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            return res.status(400).json({ success: false, message: "All password fields are required" });
         }
-
-        // =================================================
-        // PASSWORD LENGTH
-        // =================================================
-
         if (newPassword.length < 6) {
-            return res.status(400).json({
-                success: false,
-                message: "New password must be at least 6 characters"
-            });
+            return res.status(400).json({ success: false, message: "New password must be at least 6 characters" });
         }
-
-        // =================================================
-        // CONFIRM PASSWORD
-        // =================================================
-
         if (newPassword !== confirmPassword) {
-            return res.status(400).json({
-                success: false,
-                message: "New password and confirm password do not match"
-            });
+            return res.status(400).json({ success: false, message: "New password and confirm password do not match" });
         }
-
-        // =================================================
-        // GET CURRENT PASSWORD
-        // =================================================
-
-        const selectSql = `
-            SELECT
-                id,
-                password
-            FROM admins
-            WHERE id = ?
-            LIMIT 1
-        `;
 
         const [results] = await db.query(
-            selectSql,
+            `SELECT id, password FROM admins WHERE id = ? LIMIT 1`,
             [adminId]
         );
-
         if (results.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: "Admin not found"
-            });
+            return res.status(404).json({ success: false, message: "Admin not found" });
         }
 
-        const admin = results[0];
-
-        // =================================================
-        // CHECK CURRENT PASSWORD
-        // =================================================
-
-        const passwordMatch = await bcrypt.compare(
-            currentPassword,
-            admin.password
-        );
-
+        const passwordMatch = await bcrypt.compare(currentPassword, results[0].password);
         if (!passwordMatch) {
-            return res.status(401).json({
-                success: false,
-                message: "Current password is incorrect"
-            });
+            return res.status(401).json({ success: false, message: "Current password is incorrect" });
         }
 
-        // =================================================
-        // HASH NEW PASSWORD
-        // =================================================
-
-        const hashedPassword = await bcrypt.hash(
-            newPassword,
-            10
-        );
-
-        // =================================================
-        // UPDATE PASSWORD
-        // =================================================
-
-        const updateSql = `
-            UPDATE admins
-            SET password = ?
-            WHERE id = ?
-        `;
-
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
         const [updateResult] = await db.query(
-            updateSql,
-            [
-                hashedPassword,
-                adminId
-            ]
+            `UPDATE admins SET password = ? WHERE id = ?`,
+            [hashedPassword, adminId]
         );
-
         if (updateResult.affectedRows === 0) {
-            return res.status(404).json({
-                success: false,
-                message: "Admin not found"
-            });
+            return res.status(404).json({ success: false, message: "Admin not found" });
         }
-
-        return res.status(200).json({
-            success: true,
-            message: "Password changed successfully"
-        });
-
+        return res.status(200).json({ success: true, message: "Password changed successfully" });
     } catch (error) {
-        console.error(
-            "Change Admin Password Error:",
-            error
-        );
-
-        return res.status(500).json({
-            success: false,
-            message: "Server error",
-            error: error.message
-        });
+        console.error("Change Admin Password Error:", error);
+        return res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };
 
-// =====================================================
-// EXPORT
-// =====================================================
-
-module.exports = {
-    getAdminProfile,
-    updateAdminProfile,
-    changeAdminPassword
-};
+module.exports = { getAdminProfile, updateAdminProfile, changeAdminPassword };

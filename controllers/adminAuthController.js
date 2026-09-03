@@ -1,151 +1,64 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-
 const db = require("../config/database");
-
-// =====================================================
-// ADMIN LOGIN
-// =====================================================
 
 const adminLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
-
-        // =================================================
-        // VALIDATION
-        // =================================================
-
         if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: "Email and password are required"
-            });
+            return res.status(400).json({ success: false, message: "Email and password are required" });
         }
 
         const cleanEmail = email.trim().toLowerCase();
-
-        // =================================================
-        // FIND ADMIN
-        // =================================================
-
         const sql = `
-            SELECT
-                id,
-                name,
-                email,
-                password,
-                phone
+            SELECT id, name, email, password, phone, photo
             FROM admins
             WHERE LOWER(email) = ?
             LIMIT 1
         `;
-
-        const [results] = await db.query(
-            sql,
-            [cleanEmail]
-        );
-
-        // =================================================
-        // ADMIN NOT FOUND
-        // =================================================
+        const [results] = await db.query(sql, [cleanEmail]);
 
         if (results.length === 0) {
-            return res.status(401).json({
-                success: false,
-                message: "Invalid email or password"
-            });
+            return res.status(401).json({ success: false, message: "Invalid email or password" });
         }
 
         const admin = results[0];
-
-        // =================================================
-        // PASSWORD CHECK
-        // =================================================
-
         if (!admin.password) {
-            return res.status(500).json({
-                success: false,
-                message: "Admin password is not configured"
-            });
+            return res.status(500).json({ success: false, message: "Admin password is not configured" });
         }
 
-        const passwordMatch = await bcrypt.compare(
-            password,
-            admin.password
-        );
-
+        const passwordMatch = await bcrypt.compare(password, admin.password);
         if (!passwordMatch) {
-            return res.status(401).json({
-                success: false,
-                message: "Invalid email or password"
-            });
+            return res.status(401).json({ success: false, message: "Invalid email or password" });
         }
-
-        // =================================================
-        // JWT SECRET CHECK
-        // =================================================
 
         if (!process.env.JWT_SECRET) {
-            console.error(
-                "❌ JWT_SECRET is missing in .env"
-            );
-
-            return res.status(500).json({
-                success: false,
-                message: "JWT secret is not configured"
-            });
+            console.error("❌ JWT_SECRET is missing in .env");
+            return res.status(500).json({ success: false, message: "JWT secret is not configured" });
         }
 
-        // =================================================
-        // CREATE JWT
-        // =================================================
-
         const token = jwt.sign(
-            {
-                id: admin.id,
-                email: admin.email,
-                role: "admin"
-            },
+            { id: admin.id, email: admin.email, role: "admin" },
             process.env.JWT_SECRET,
-            {
-                expiresIn: "1d"
-            }
+            { expiresIn: "1d" }
         );
-
-        // =================================================
-        // SUCCESS RESPONSE
-        // =================================================
 
         return res.status(200).json({
             success: true,
             message: "Admin login successful",
-            token: token,
+            token,
             admin: {
                 id: admin.id,
                 name: admin.name,
                 email: admin.email,
-                phone: admin.phone
+                phone: admin.phone,
+                photo: admin.photo
             }
         });
-
     } catch (error) {
-        console.error(
-            "❌ Admin Login Error:",
-            error
-        );
-
-        return res.status(500).json({
-            success: false,
-            message: "Server error",
-            error: error.message
-        });
+        console.error("❌ Admin Login Error:", error);
+        return res.status(500).json({ success: false, message: "Server error", error: error.message });
     }
 };
 
-// =====================================================
-// EXPORT
-// =====================================================
-
-module.exports = {
-    adminLogin
-};
+module.exports = { adminLogin };

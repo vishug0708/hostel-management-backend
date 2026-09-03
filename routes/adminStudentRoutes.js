@@ -8,6 +8,7 @@ const {
 } = require("../controllers/adminStudentController");
 
 const authMiddleware = require("../middleware/authMiddleware");
+const uploadStudentPhoto = require("../middleware/uploadStudentPhoto");
 
 const router = express.Router();
 
@@ -30,6 +31,7 @@ router.get(
 router.post(
     "/",
     authMiddleware,
+    uploadStudentPhoto.single("photo"),
     addStudent
 );
 
@@ -51,6 +53,7 @@ router.get(
 router.put(
     "/:id",
     authMiddleware,
+    uploadStudentPhoto.single("photo"),
     updateStudent
 );
 

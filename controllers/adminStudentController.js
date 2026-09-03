@@ -98,9 +98,10 @@ const addStudent = async (req, res) => {
                 parent_email,
                 college,
                 course,
-                hostel
+                hostel,
+                photo
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const [result] = await db.query(
@@ -113,7 +114,8 @@ const addStudent = async (req, res) => {
                 parent_email,
                 college,
                 course,
-                hostel
+                hostel,
+                req.file ? req.file.filename : null
             ]
         );
 
@@ -128,7 +130,8 @@ const addStudent = async (req, res) => {
                 parent_email,
                 college,
                 course,
-                hostel
+                hostel,
+                photo: req.file ? req.file.filename : null
             }
         });
 
@@ -332,7 +335,7 @@ const updateStudent = async (req, res) => {
         // UPDATE STUDENT
         // =================================================
 
-        const updateSql = `
+        let updateSql = `
             UPDATE students
             SET
                 name = ?,
@@ -342,21 +345,34 @@ const updateStudent = async (req, res) => {
                 college = ?,
                 course = ?,
                 hostel = ?
+        `;
+
+        const updateValues = [
+            name,
+            email,
+            mobile,
+            parent_email,
+            college,
+            course,
+            hostel
+        ];
+
+        if (req.file) {
+            updateSql += `,
+                photo = ?
+            `;
+            updateValues.push(req.file.filename);
+        }
+
+        updateSql += `
             WHERE id = ?
         `;
 
+        updateValues.push(id);
+
         const [result] = await db.query(
             updateSql,
-            [
-                name,
-                email,
-                mobile,
-                parent_email,
-                college,
-                course,
-                hostel,
-                id
-            ]
+            updateValues
         );
 
         if (result.affectedRows === 0) {

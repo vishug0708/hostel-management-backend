@@ -15,6 +15,7 @@ const adminComplaintRoutes = require("./routes/adminComplaintRoutes");
 const adminCricketGroundRoutes = require("./routes/adminCricketGroundRoutes");
 const adminCricketBookingRoutes = require("./routes/adminCricketBookingRoutes");
 const adminCricketReportRoutes = require("./routes/adminCricketReportRoutes");
+const adminStaffRoutes = require("./routes/adminStaffRoutes");
 
 
 const rectorRoutes = require("./routes/rectorRoutes");
@@ -158,7 +159,11 @@ app.use(
     adminCricketReportRoutes
 );
 
-;
+app.use("/api/admin/staff", adminStaffRoutes);
+
+
+
+
 
 
 app.use(

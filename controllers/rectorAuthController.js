@@ -1,13 +1,9 @@
-const bcrypt = require("bcryptjs");
 const db = require("../config/database");
+const bcrypt = require("bcryptjs");
 
 const rectorLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
-
-        // =============================================
-        // VALIDATION
-        // =============================================
 
         if (!email || !password) {
             return res.status(400).json({
@@ -16,66 +12,43 @@ const rectorLogin = async (req, res) => {
             });
         }
 
-        const cleanEmail = email
-            .trim()
-            .toLowerCase();
+        const cleanEmail = String(email).trim().toLowerCase();
 
-        // =============================================
-        // FIND RECTOR
-        // =============================================
-
-        const sql = `
-            SELECT
-                id,
-                name,
-                email,
-                password,
-                phone
-            FROM rectors
-            WHERE LOWER(email) = ?
-            LIMIT 1
-        `;
-
-        const [results] = await db.query(
-            sql,
+        const [rows] = await db.query(
+            `SELECT id, rector_id, name, email, password, phone, status, photo, salary
+             FROM rectors
+             WHERE LOWER(email) = ?
+             LIMIT 1`,
             [cleanEmail]
         );
 
-        // =============================================
-        // RECTOR NOT FOUND
-        // =============================================
-
-        if (results.length === 0) {
+        if (!rows.length) {
             return res.status(401).json({
                 success: false,
                 message: "Invalid email or password."
             });
         }
 
-        const rector = results[0];
+        const rector = rows[0];
 
-        // =============================================
-        // PASSWORD CHECK
-        // =============================================
-
-        let passwordMatch = false;
-
-        try {
-            passwordMatch = await bcrypt.compare(
-                password,
-                rector.password
-            );
-        } catch (bcryptError) {
-            console.error(
-                "Bcrypt Error:",
-                bcryptError
-            );
-
-            // Supports plain-text password
-            // if your current DB contains one.
-            passwordMatch =
-                password === rector.password;
+        if (String(rector.status || "").toLowerCase() !== "active") {
+            return res.status(403).json({
+                success: false,
+                message: "Your account has been deactivated. Please contact the administrator."
+            });
         }
+
+        if (!rector.password) {
+            return res.status(500).json({
+                success: false,
+                message: "Rector password is not configured."
+            });
+        }
+
+        const passwordMatch = await bcrypt.compare(
+            String(password),
+            rector.password
+        );
 
         if (!passwordMatch) {
             return res.status(401).json({
@@ -84,37 +57,32 @@ const rectorLogin = async (req, res) => {
             });
         }
 
-        // =============================================
-        // REMOVE PASSWORD FROM RESPONSE
-        // =============================================
+        const rectorData = {
+            id: rector.id,
+            rector_id: rector.rector_id,
+            name: rector.name,
+            email: rector.email,
+            phone: rector.phone,
+            status: rector.status,
+            photo: rector.photo,
+            salary: rector.salary
+        };
 
-        delete rector.password;
-
-        // =============================================
-        // SUCCESS
-        // =============================================
-
+        // Keep compatibility with the existing Rector frontend/dashboard.
         return res.status(200).json({
             success: true,
             message: "Rector login successful.",
-            rector
+            token: `rector-${rector.id}`,
+            rector: rectorData
         });
-
     } catch (error) {
-        console.error(
-            "Rector Login Error:",
-            error
-        );
-
+        console.error("Rector Login Error:", error);
         return res.status(500).json({
             success: false,
-            message:
-                "Server error during rector login.",
+            message: "Server error during rector login.",
             error: error.message
         });
     }
 };
 
-module.exports = {
-    rectorLogin
-};
+module.exports = { rectorLogin };

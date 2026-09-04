@@ -1,187 +1,65 @@
-const db = require("../config/database");
-const bcrypt = require("bcryptjs");
+const db = require('../config/database');
+const bcrypt = require('bcryptjs');
 
 const findRector = async (id) => {
-    const [rows] = await db.query(
-        "SELECT id, rector_id, name, email, phone, password, role, status, photo, salary, created_at FROM rectors WHERE id = ? LIMIT 1",
-        [id]
-    );
-    return rows[0] || null;
+  const [rows] = await db.query('SELECT id, rector_id, name, email, phone, password, role, status, photo, salary FROM rectors WHERE id = ? LIMIT 1', [id]);
+  return rows[0] || null;
 };
 
 exports.getRectors = async (req, res) => {
-    try {
-        const [rectors] = await db.query(
-            "SELECT id, rector_id, name, email, phone, role, status, photo, salary, created_at FROM rectors ORDER BY id DESC"
-        );
-        res.json({ success: true, rectors });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to fetch rectors.", error: error.message });
-    }
+  try {
+    const [rectors] = await db.query('SELECT id, rector_id, name, email, phone, role, status, photo, salary FROM rectors ORDER BY id DESC');
+    res.json({ success: true, rectors });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to fetch rectors.', error: error.message }); }
 };
 
 exports.getRector = async (req, res) => {
-    try {
-        const rector = await findRector(req.params.id);
-        if (!rector) return res.status(404).json({ success: false, message: "Rector not found." });
-        delete rector.password;
-        res.json({ success: true, rector });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to fetch rector.", error: error.message });
-    }
+  try {
+    const rector = await findRector(req.params.id);
+    if (!rector) return res.status(404).json({ success: false, message: 'Rector not found.' });
+    delete rector.password;
+    res.json({ success: true, rector });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to fetch rector.', error: error.message }); }
 };
 
 exports.addRector = async (req, res) => {
-    try {
-        const { rector_id, name, email, phone, mobile, password, role, status, salary } = req.body;
-
-        const cleanPhone = String(phone ?? mobile ?? "").trim();
-
-        if (!rector_id || !name || !email || !password || !role || salary === undefined || salary === "") {
-            return res.status(400).json({
-                success: false,
-                message: "Rector ID, name, email, password, role and salary are required."
-            });
-        }
-
-        const cleanEmail = String(email).trim().toLowerCase();
-
-        const [dup] = await db.query(
-            "SELECT id FROM rectors WHERE rector_id = ? OR email = ? LIMIT 1",
-            [String(rector_id).trim(), cleanEmail]
-        );
-
-        if (dup.length) {
-            return res.status(409).json({ success: false, message: "Rector ID or email already exists." });
-        }
-
-        const hashed = await bcrypt.hash(String(password), 10);
-        const photo = req.file ? `rectors/${req.file.filename}` : null;
-
-        const [result] = await db.query(
-            "INSERT INTO rectors (rector_id,name,email,phone,password,role,status,photo,salary) VALUES (?,?,?,?,?,?,?,?,?)",
-            [
-                String(rector_id).trim(),
-                String(name).trim(),
-                cleanEmail,
-                cleanPhone || null,
-                hashed,
-                String(role).trim(),
-                String(status || "active").toLowerCase(),
-                photo,
-                Number(salary)
-            ]
-        );
-
-        const rector = await findRector(result.insertId);
-        if (rector) delete rector.password;
-
-        res.status(201).json({
-            success: true,
-            message: "Rector added successfully.",
-            rector
-        });
-    } catch (error) {
-        console.error("addRector error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to add rector.",
-            error: error.message
-        });
-    }
+  try {
+    const { rector_id, name, email, phone, mobile, password, role, status, salary } = req.body;
+    const cleanPhone = String(phone ?? mobile ?? '').trim();
+    if (!rector_id || !name || !email || !password || !role || salary === undefined || salary === '') return res.status(400).json({ success: false, message: 'Rector ID, name, email, password, role and salary are required.' });
+    const cleanEmail = String(email).trim().toLowerCase();
+    const [dup] = await db.query('SELECT id FROM rectors WHERE rector_id = ? OR email = ? LIMIT 1', [String(rector_id).trim(), cleanEmail]);
+    if (dup.length) return res.status(409).json({ success: false, message: 'Rector ID or email already exists.' });
+    const hashed = await bcrypt.hash(String(password), 10);
+    const photo = req.file ? `rectors/${req.file.filename}` : null;
+    const [result] = await db.query('INSERT INTO rectors (rector_id,name,email,phone,password,role,status,photo,salary) VALUES (?,?,?,?,?,?,?,?,?)', [String(rector_id).trim(), String(name).trim(), cleanEmail, cleanPhone || null, hashed, String(role).trim(), String(status || 'active').toLowerCase(), photo, Number(salary)]);
+    res.status(201).json({ success: true, message: 'Rector added successfully.', rector: await findRector(result.insertId) });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to add rector.', error: error.message }); }
 };
 
 exports.updateRector = async (req, res) => {
-    try {
-        const old = await findRector(req.params.id);
-
-        if (!old) {
-            return res.status(404).json({ success: false, message: "Rector not found." });
-        }
-
-        const { rector_id, name, email, phone, mobile, password, role, status, salary } = req.body;
-        const cleanPhone = String(phone ?? mobile ?? "").trim();
-        const cleanEmail = String(email).trim().toLowerCase();
-
-        const [dup] = await db.query(
-            "SELECT id FROM rectors WHERE (rector_id = ? OR email = ?) AND id <> ? LIMIT 1",
-            [String(rector_id).trim(), cleanEmail, req.params.id]
-        );
-
-        if (dup.length) {
-            return res.status(409).json({ success: false, message: "Rector ID or email already exists." });
-        }
-
-        const hashed = password && String(password).trim()
-            ? await bcrypt.hash(String(password), 10)
-            : old.password;
-
-        const photo = req.file ? `rectors/${req.file.filename}` : old.photo;
-
-        await db.query(
-            "UPDATE rectors SET rector_id=?,name=?,email=?,phone=?,password=?,role=?,status=?,photo=?,salary=? WHERE id=?",
-            [
-                String(rector_id).trim(),
-                String(name).trim(),
-                cleanEmail,
-                cleanPhone || null,
-                hashed,
-                String(role).trim(),
-                String(status || "active").toLowerCase(),
-                photo,
-                Number(salary),
-                req.params.id
-            ]
-        );
-
-        const rector = await findRector(req.params.id);
-        if (rector) delete rector.password;
-
-        res.json({
-            success: true,
-            message: "Rector updated successfully.",
-            rector
-        });
-    } catch (error) {
-        console.error("updateRector error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to update rector.",
-            error: error.message
-        });
-    }
+  try {
+    const old = await findRector(req.params.id);
+    if (!old) return res.status(404).json({ success: false, message: 'Rector not found.' });
+    const { rector_id, name, email, phone, mobile, password, role, status, salary } = req.body;
+    const cleanPhone = String(phone ?? mobile ?? '').trim();
+    const cleanEmail = String(email).trim().toLowerCase();
+    const [dup] = await db.query('SELECT id FROM rectors WHERE (rector_id = ? OR email = ?) AND id <> ? LIMIT 1', [String(rector_id).trim(), cleanEmail, req.params.id]);
+    if (dup.length) return res.status(409).json({ success: false, message: 'Rector ID or email already exists.' });
+    const hashed = password && String(password).trim() ? await bcrypt.hash(String(password), 10) : old.password;
+    const photo = req.file ? `rectors/${req.file.filename}` : old.photo;
+    await db.query('UPDATE rectors SET rector_id=?,name=?,email=?,phone=?,password=?,role=?,status=?,photo=?,salary=? WHERE id=?', [String(rector_id).trim(), String(name).trim(), cleanEmail, cleanPhone || null, hashed, String(role).trim(), String(status || 'active').toLowerCase(), photo, Number(salary), req.params.id]);
+    res.json({ success: true, message: 'Rector updated successfully.', rector: await findRector(req.params.id) });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to update rector.', error: error.message }); }
 };
 
 exports.updateRectorStatus = async (req, res) => {
-    try {
-        const rector = await findRector(req.params.id);
-
-        if (!rector) {
-            return res.status(404).json({ success: false, message: "Rector not found." });
-        }
-
-        const status = String(req.body.status || "").toLowerCase();
-
-        if (!["active", "inactive"].includes(status)) {
-            return res.status(400).json({ success: false, message: "Status must be active or inactive." });
-        }
-
-        await db.query("UPDATE rectors SET status=? WHERE id=?", [status, req.params.id]);
-
-        const updated = await findRector(req.params.id);
-        if (updated) delete updated.password;
-
-        res.json({
-            success: true,
-            message: "Rector status updated.",
-            rector: updated
-        });
-    } catch (error) {
-        console.error("updateRectorStatus error:", error);
-        res.status(500).json({
-            success: false,
-            message: "Failed to update status.",
-            error: error.message
-        });
-    }
+  try {
+    const rector = await findRector(req.params.id);
+    if (!rector) return res.status(404).json({ success: false, message: 'Rector not found.' });
+    const status = String(req.body.status || '').toLowerCase();
+    if (!['active', 'inactive'].includes(status)) return res.status(400).json({ success: false, message: 'Status must be active or inactive.' });
+    await db.query('UPDATE rectors SET status=? WHERE id=?', [status, req.params.id]);
+    res.json({ success: true, message: 'Rector status updated.', rector: await findRector(req.params.id) });
+  } catch (error) { res.status(500).json({ success: false, message: 'Failed to update status.', error: error.message }); }
 };

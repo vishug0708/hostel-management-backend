@@ -5,6 +5,11 @@ const {
     createPaidNotification
 } = require("../services/salaryService");
 
+const {
+    createPayout,
+    getPayout
+} = require("../services/razorpayXService");
+
 const requireAdmin = (req, res) => {
     const header = req.headers.authorization || "";
     const token = header.startsWith("Bearer ")
@@ -402,25 +407,18 @@ const paySalary = async (req, res) => {
             });
         }
 
-        const {
-            payment_date,
-            payment_method,
-            transaction_reference,
-            remarks
-        } = req.body;
-
         const [rows] = await db.query(
             `
             SELECT
-                id,
-                person_id,
-                person_type,
-                salary_month,
-                salary_year,
-                monthly_salary,
-                payment_status
-            FROM salary
-            WHERE id = ?
+                s.id,
+                s.person_id,
+                s.person_type,
+                s.salary_month,
+                s.salary_year,
+                s.monthly_salary,
+                s.payment_status
+            FROM salary s
+            WHERE s.id = ?
             LIMIT 1
             `,
             [id]
@@ -433,57 +431,176 @@ const paySalary = async (req, res) => {
             });
         }
 
-        if (rows[0].payment_status === "paid") {
+        const salary = rows[0];
+
+        if (salary.payment_status === "paid") {
             return res.status(400).json({
                 success: false,
-                message: "This salary is already marked as paid."
+                message: "This salary is already paid."
             });
         }
 
-        const dateValue =
-            payment_date ||
-            new Date().toISOString().slice(0, 10);
-
-        const [result] = await db.query(
+        // Find RazorpayX salary account
+        const [accountRows] = await db.query(
             `
-            UPDATE salary
-            SET
-                payment_status = 'paid',
-                payment_date = ?,
-                payment_method = ?,
-                transaction_reference = ?,
-                remarks = ?
-            WHERE id = ?
-            AND payment_status = 'pending'
+            SELECT
+                id,
+                person_id,
+                person_type,
+                razorpay_contact_id,
+                razorpay_fund_account_id,
+                status
+            FROM salary_accounts
+            WHERE person_id = ?
+              AND person_type = ?
+              AND status = 'active'
+            LIMIT 1
             `,
             [
-                dateValue,
-                payment_method || null,
-                transaction_reference || null,
-                remarks || null,
-                id
+                salary.person_id,
+                salary.person_type
             ]
         );
 
-        if (!result.affectedRows) {
-            return res.status(409).json({
+        if (!accountRows[0]) {
+            return res.status(400).json({
                 success: false,
-                message: "Salary could not be marked as paid."
+                message:
+                    "RazorpayX salary account is not configured for this Staff/Rector."
             });
         }
 
-        await createPaidNotification(id, dateValue);
+        const salaryAccount = accountRows[0];
+
+        if (!salaryAccount.razorpay_fund_account_id) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "RazorpayX Fund Account is missing. Please configure the salary account first."
+            });
+        }
+
+        /*
+         * Unique salary reference.
+         * Example:
+         * SAL-2026-09-25
+         */
+        const referenceId =
+            `SAL-${salary.salary_year}-${String(
+                salary.salary_month
+            ).padStart(2, "0")}-${salary.id}`;
+
+        /*
+         * Create RazorpayX Test Payout
+         */
+        const payout = await createPayout({
+            fundAccountId:
+                salaryAccount.razorpay_fund_account_id,
+
+            amount: salary.monthly_salary,
+
+            referenceId,
+
+            narration:
+                `${salary.person_type === "staff" ? "Staff" : "Rector"} Salary`,
+
+            salaryId: salary.id
+        });
+
+        if (!payout || !payout.id) {
+            return res.status(500).json({
+                success: false,
+                message:
+                    "RazorpayX payout was not created."
+            });
+        }
+
+        /*
+         * IMPORTANT:
+         * RazorpayX may initially return processing.
+         * Do NOT immediately mark salary as paid.
+         */
+        const razorpayStatus =
+            String(payout.status || "processing").toLowerCase();
+
+        const paymentStatus =
+            razorpayStatus === "processed"
+                ? "paid"
+                : "pending";
+
+        const paymentDate =
+            paymentStatus === "paid"
+                ? new Date().toISOString().slice(0, 10)
+                : null;
+
+        /*
+         * Save RazorpayX payout information.
+         */
+        await db.query(
+            `
+            UPDATE salary
+            SET
+                payment_status = ?,
+                payment_date = ?,
+                payment_method = 'RazorpayX Test',
+                transaction_reference = ?,
+                razorpay_payout_id = ?,
+                razorpay_status = ?
+            WHERE id = ?
+              AND payment_status = 'pending'
+            `,
+            [
+                paymentStatus,
+                paymentDate,
+                payout.id,
+                payout.id,
+                razorpayStatus,
+                salary.id
+            ]
+        );
+
+        /*
+         * Create paid notification only when
+         * RazorpayX says the payout is processed.
+         */
+        if (paymentStatus === "paid") {
+            await createPaidNotification(
+                salary.id,
+                paymentDate
+            );
+        }
 
         return res.json({
             success: true,
-            message: "Salary marked as paid successfully."
+            message:
+                paymentStatus === "paid"
+                    ? "Salary paid successfully through RazorpayX Test Mode."
+                    : "RazorpayX Test payout created successfully. Payment is processing.",
+
+            salary_status: paymentStatus,
+
+            payout: {
+                id: payout.id,
+                status: payout.status,
+                amount: payout.amount,
+                currency: payout.currency,
+                reference_id: payout.reference_id
+            }
         });
+
     } catch (error) {
-        console.error("Pay salary error:", error);
+        console.error(
+            "Pay salary / RazorpayX error:",
+            error.response?.data || error
+        );
 
         return res.status(500).json({
             success: false,
-            message: "Failed to process salary payment."
+            message:
+                error.response?.data?.error?.description ||
+                error.response?.data?.message ||
+                error.message ||
+                "Failed to process salary payment through RazorpayX."
         });
     }
 };

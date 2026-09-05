@@ -13,6 +13,7 @@ const db = require("./config/database");
 // =====================================================
 
 const { generateMonthlySalaries } = require("./services/salaryService");
+const salaryAccountRoutes = require("./routes/salaryAccountRoutes");
 
 
 // =====================================================
@@ -205,6 +206,7 @@ app.use("/api/admin/rectors", adminRectorRoutes);
 
 app.use("/api/admin/salary", adminSalaryRoutes);
 
+app.use("/api/admin/salary-accounts", salaryAccountRoutes);
 
 // =====================================================
 // RECTOR PROTECTED ROUTES

@@ -6,6 +6,15 @@ const path = require("path");
 
 const db = require("./config/database");
 
+
+
+// =====================================================
+// SERVICE PROTECTED ROUTES
+// =====================================================
+
+const { generateMonthlySalaries } = require("./services/salaryService");
+
+
 // =====================================================
 // ADMIN PROTECTED ROUTES
 // =====================================================
@@ -21,6 +30,7 @@ const adminCricketBookingRoutes = require("./routes/adminCricketBookingRoutes");
 const adminCricketReportRoutes = require("./routes/adminCricketReportRoutes");
 const adminStaffRoutes = require("./routes/adminStaffRoutes");
 const adminRectorRoutes = require("./routes/adminRectorRoutes");
+const adminSalaryRoutes = require("./routes/adminSalaryRoutes");
 
 
 
@@ -34,6 +44,7 @@ const rectorRoomRoutes = require("./routes/rectorRoomRoutes");
 const rectorRoomAllocationRoutes = require("./routes/rectorRoomAllocationRoutes");
 const rectorRoomDeAllocationRoutes = require("./routes/rectorRoomDeAllocationRoutes");
 const rectorGatePassRoutes = require("./routes/rectorGatePassRoutes");
+const rectorSalaryRoutes = require("./routes/rectorSalaryRoutes");
 
 
 // =====================================================
@@ -51,6 +62,7 @@ const studentGatePassRoutes = require("./routes/studentGatePassRoutes");
 
 const staffAuthRoutes = require("./routes/staffAuthRoutes");
 const staffRoutes = require("./routes/staffRoutes");
+const staffSalaryRoutes = require("./routes/staffSalaryRoutes");
 
 
 // =====================================================
@@ -191,6 +203,8 @@ app.use("/api/admin/staff", adminStaffRoutes);
 app.use("/api/admin/rectors", adminRectorRoutes);
 
 
+app.use("/api/admin/salary", adminSalaryRoutes);
+
 
 // =====================================================
 // RECTOR PROTECTED ROUTES
@@ -227,6 +241,8 @@ app.use(
     rectorGatePassRoutes
 );
 
+app.use("/api/rector/salary", rectorSalaryRoutes);
+
 
 
 // =====================================================
@@ -257,6 +273,8 @@ app.use(
 app.use("/api/staff/auth", staffAuthRoutes);
 
 app.use("/api/staff", staffRoutes);
+
+app.use("/api/staff/salary", staffSalaryRoutes);
 
 
 // =====================================================

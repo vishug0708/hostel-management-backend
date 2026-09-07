@@ -8,23 +8,78 @@ const getRooms = async (req, res) => {
     try {
         const [rooms] = await db.query(`
             SELECT
-                id,
-                block,
-                room_no,
-                total_beds,
-                status,
-                hostel,
-                created_at
-            FROM rooms
-            ORDER BY block ASC, room_no ASC
+                r.id,
+                r.block,
+                r.room_no,
+                r.total_beds,
+                r.status,
+                r.hostel,
+                r.created_at,
+
+                COUNT(
+                    CASE
+                        WHEN ra.status = 'Allocated'
+                        THEN ra.id
+                    END
+                ) AS allocated_beds
+
+            FROM rooms r
+
+            LEFT JOIN room_allocation ra
+                ON ra.room_id = r.id
+
+            GROUP BY
+                r.id,
+                r.block,
+                r.room_no,
+                r.total_beds,
+                r.status,
+                r.hostel,
+                r.created_at
+
+            ORDER BY
+                r.block ASC,
+                r.room_no ASC
         `);
+
+        const formattedRooms = rooms.map((room) => {
+            const totalBeds = Number(room.total_beds || 0);
+            const allocatedBeds = Number(room.allocated_beds || 0);
+
+            const vacantBeds = Math.max(
+                totalBeds - allocatedBeds,
+                0
+            );
+
+            let roomStatus = room.status || "Available";
+
+            if (room.status !== "Maintenance") {
+                if (allocatedBeds >= totalBeds && totalBeds > 0) {
+                    roomStatus = "Occupied";
+                } else {
+                    roomStatus = "Available";
+                }
+            }
+
+            return {
+                ...room,
+                total_beds: totalBeds,
+                allocated_beds: allocatedBeds,
+                vacant_beds: vacantBeds,
+                status: roomStatus
+            };
+        });
 
         return res.status(200).json({
             success: true,
-            rooms
+            rooms: formattedRooms
         });
+
     } catch (error) {
-        console.error("Get Rooms Error:", error);
+        console.error(
+            "Get Rooms Error:",
+            error
+        );
 
         return res.status(500).json({
             success: false,
@@ -66,10 +121,122 @@ const getRoomById = async (req, res) => {
             });
         }
 
+        const room = rooms[0];
+
+        // ================================================
+        // GET CURRENT ACTIVE STUDENT ALLOCATIONS
+        // ================================================
+
+        const [allocations] = await db.query(
+            `
+            SELECT
+                ra.id,
+                ra.student_id,
+                ra.room_id,
+                ra.bed_no,
+                ra.allocation_date,
+                ra.status,
+
+                s.name AS student_name,
+                s.email AS student_email
+
+            FROM room_allocation ra
+
+            LEFT JOIN students s
+                ON s.id = ra.student_id
+
+            WHERE ra.room_id = ?
+              AND ra.status = 'Allocated'
+
+            ORDER BY ra.bed_no ASC
+            `,
+            [id]
+        );
+
+        // ================================================
+        // BED COUNTS
+        // ================================================
+
+        const totalBeds =
+            Number(room.total_beds || 0);
+
+        const allocatedBeds =
+            allocations.length;
+
+        const vacantBeds =
+            Math.max(
+                totalBeds - allocatedBeds,
+                0
+            );
+
+        // ================================================
+        // ROOM STATUS
+        // ================================================
+
+        let roomStatus = "Available";
+
+        if (room.status === "Maintenance") {
+            roomStatus = "Maintenance";
+        } else if (
+            totalBeds > 0 &&
+            allocatedBeds >= totalBeds
+        ) {
+            roomStatus = "Occupied";
+        } else if (allocatedBeds > 0) {
+            roomStatus = "Partially Allocated";
+        }
+
+        // ================================================
+        // RESPONSE
+        // ================================================
+
         return res.status(200).json({
             success: true,
-            room: rooms[0]
+
+            room: {
+                id: room.id,
+                block: room.block,
+                room_no: room.room_no,
+                total_beds: totalBeds,
+                status: roomStatus,
+                hostel: room.hostel,
+
+                allocated_beds: allocatedBeds,
+                vacant_beds: vacantBeds,
+
+                allocations: allocations.map(
+                    (allocation) => ({
+                        id: allocation.id,
+
+                        student_id:
+                            allocation.student_id,
+
+                        student_name:
+                            allocation.student_name ||
+                            "Unknown Student",
+
+                        student_email:
+                            allocation.student_email ||
+                            "",
+
+                        room_id:
+                            allocation.room_id,
+
+                        bed_no:
+                            Number(
+                                allocation.bed_no || 0
+                            ),
+
+                        allocation_date:
+                            allocation.allocation_date,
+
+                        status:
+                            allocation.status
+                    })
+                )
+            }
         });
+
     } catch (error) {
         console.error(
             "Get Room By ID Error:",

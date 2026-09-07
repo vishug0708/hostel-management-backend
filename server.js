@@ -9,11 +9,13 @@ const db = require("./config/database");
 
 
 // =====================================================
-// SERVICE PROTECTED ROUTES
+// salary PROTECTED ROUTES
 // =====================================================
 
 const { generateMonthlySalaries } = require("./services/salaryService");
 const salaryAccountRoutes = require("./routes/salaryAccountRoutes");
+
+const razorpayWebhookRoutes = require("./routes/razorpayWebhookRoutes");
 
 
 // =====================================================
@@ -95,6 +97,15 @@ app.use(
 );
 
 
+
+app.use(
+    "/api/webhooks/razorpayx",
+    express.raw({
+        type: "application/json"
+    })
+);
+
+
 // =====================================================
 // TEST API
 // =====================================================
@@ -141,6 +152,13 @@ app.get("/api/test-db", async (req, res) => {
 app.use(
     "/uploads",
     express.static(path.join(__dirname, "uploads"))
+);
+
+
+
+app.use(
+    "/api/webhooks",
+    razorpayWebhookRoutes
 );
 
 

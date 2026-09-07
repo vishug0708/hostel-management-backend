@@ -123,9 +123,9 @@ const getRoomById = async (req, res) => {
 
         const room = rooms[0];
 
-        // ================================================
-        // GET CURRENT ACTIVE STUDENT ALLOCATIONS
-        // ================================================
+        // ==========================================
+        // GET ACTIVE ALLOCATIONS + STUDENT DETAILS
+        // ==========================================
 
         const [allocations] = await db.query(
             `
@@ -153,9 +153,9 @@ const getRoomById = async (req, res) => {
             [id]
         );
 
-        // ================================================
+        // ==========================================
         // BED COUNTS
-        // ================================================
+        // ==========================================
 
         const totalBeds =
             Number(room.total_beds || 0);
@@ -169,30 +169,29 @@ const getRoomById = async (req, res) => {
                 0
             );
 
-        // ================================================
+        // ==========================================
         // ROOM STATUS
-        // ================================================
+        // ==========================================
 
-        let roomStatus = "Available";
+        let roomStatus = room.status || "Available";
 
-        if (room.status === "Maintenance") {
-            roomStatus = "Maintenance";
-        } else if (
-            totalBeds > 0 &&
-            allocatedBeds >= totalBeds
-        ) {
-            roomStatus = "Occupied";
-        } else if (allocatedBeds > 0) {
-            roomStatus = "Partially Allocated";
+        if (room.status !== "Maintenance") {
+            if (
+                totalBeds > 0 &&
+                allocatedBeds >= totalBeds
+            ) {
+                roomStatus = "Occupied";
+            } else {
+                roomStatus = "Available";
+            }
         }
 
-        // ================================================
-        // RESPONSE
-        // ================================================
+        // ==========================================
+        // FINAL RESPONSE
+        // ==========================================
 
         return res.status(200).json({
             success: true,
-
             room: {
                 id: room.id,
                 block: room.block,
@@ -200,41 +199,40 @@ const getRoomById = async (req, res) => {
                 total_beds: totalBeds,
                 status: roomStatus,
                 hostel: room.hostel,
-
                 allocated_beds: allocatedBeds,
-                vacant_beds: vacantBeds,
+                vacant_beds: vacantBeds
+            },
 
-                allocations: allocations.map(
-                    (allocation) => ({
-                        id: allocation.id,
+            allocations: allocations.map(
+                (allocation) => ({
+                    id: allocation.id,
 
-                        student_id:
-                            allocation.student_id,
+                    student_id:
+                        allocation.student_id,
 
-                        student_name:
-                            allocation.student_name ||
-                            "Unknown Student",
+                    student_name:
+                        allocation.student_name ||
+                        "Unknown Student",
 
-                        student_email:
-                            allocation.student_email ||
-                            "",
+                    student_email:
+                        allocation.student_email ||
+                        "",
 
-                        room_id:
-                            allocation.room_id,
+                    room_id:
+                        allocation.room_id,
 
-                        bed_no:
-                            Number(
-                                allocation.bed_no || 0
-                            ),
+                    bed_no:
+                        Number(
+                            allocation.bed_no || 0
+                        ),
 
-                        allocation_date:
-                            allocation.allocation_date,
+                    allocation_date:
+                        allocation.allocation_date,
 
-                        status:
-                            allocation.status
-                    })
-                )
-            }
+                    status:
+                        allocation.status
+                })
+            )
         });
 
     } catch (error) {

@@ -1185,13 +1185,88 @@ const verifyPayment = async (req, res) => {
             [booking.id, studentId]
         );
 
+        const [existingQr] = await connection.query(
+            `
+    SELECT id, qr_token, qr_status, expires_at
+    FROM cricket_booking_qr
+    WHERE booking_id = ?
+    LIMIT 1
+    `,
+            [booking.id]
+        );
+
+        let qrToken;
+
+        if (existingQr.length > 0) {
+            qrToken = existingQr[0].qr_token;
+
+            await connection.query(
+                `
+        UPDATE cricket_booking_qr
+        SET qr_status = 'Active',
+            expires_at = STR_TO_DATE(
+                CONCAT(
+                    DATE_FORMAT(?, '%Y-%m-%d'),
+                    ' ',
+                    TIME_FORMAT(?, '%H:%i:%s')
+                ),
+                '%Y-%m-%d %H:%i:%s'
+            )
+        WHERE booking_id = ?
+        `,
+                [
+                    booking.booking_date,
+                    booking.end_time,
+                    booking.id
+                ]
+            );
+        } else {
+            qrToken = crypto.randomBytes(32).toString("hex");
+
+            await connection.query(
+                `
+        INSERT INTO cricket_booking_qr
+        (
+            booking_id,
+            qr_token,
+            qr_status,
+            expires_at
+        )
+        VALUES (
+            ?,
+            ?,
+            'Active',
+            STR_TO_DATE(
+                CONCAT(
+                    DATE_FORMAT(?, '%Y-%m-%d'),
+                    ' ',
+                    TIME_FORMAT(?, '%H:%i:%s')
+                ),
+                '%Y-%m-%d %H:%i:%s'
+            )
+        )
+        `,
+                [
+                    booking.id,
+                    qrToken,
+                    booking.booking_date,
+                    booking.end_time
+                ]
+            );
+        }
+
         await connection.commit();
 
         return res.status(200).json({
             success: true,
             message: "Payment verified successfully.",
             payment_id: razorpay_payment_id,
-            payment_status: "Paid"
+            payment_status: "Paid",
+            qr: {
+                booking_id: booking.id,
+                qr_token: qrToken,
+                qr_status: "Active"
+            }
         });
     } catch (error) {
         console.error("Razorpay Payment Verification Error:", error);

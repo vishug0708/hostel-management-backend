@@ -1,0 +1,815 @@
+const db = require("../config/database");
+
+// =====================================================
+// GET AVAILABLE CRICKET GROUNDS
+// =====================================================
+
+const getGrounds = async (req, res) => {
+    try {
+        const [grounds] = await db.query(`
+            SELECT
+                id,
+                name,
+                location,
+                description,
+                capacity,
+                price_per_hour,
+                opening_time,
+                closing_time,
+                slot_duration,
+                status
+            FROM cricket_grounds
+            WHERE status = 'Active'
+            ORDER BY name ASC
+        `);
+
+        return res.status(200).json({
+            success: true,
+            grounds
+        });
+    } catch (error) {
+        console.error("Student Cricket Grounds Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch cricket grounds.",
+            error: error.message
+        });
+    }
+};
+
+
+// =====================================================
+// GET AVAILABLE SLOTS FOR GROUND
+// =====================================================
+
+const getGroundSlots = async (req, res) => {
+    try {
+        const { groundId } = req.params;
+
+        const [groundRows] = await db.query(
+            `
+            SELECT
+                id,
+                name,
+                status
+            FROM cricket_grounds
+            WHERE id = ?
+            LIMIT 1
+            `,
+            [groundId]
+        );
+
+        if (groundRows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Cricket ground not found."
+            });
+        }
+
+        if (groundRows[0].status !== "Active") {
+            return res.status(400).json({
+                success: false,
+                message: "This cricket ground is currently inactive."
+            });
+        }
+
+        const [slots] = await db.query(
+            `
+            SELECT
+                id,
+                ground_id,
+                slot_name,
+                start_time,
+                end_time,
+                price,
+                status
+            FROM cricket_slots
+            WHERE ground_id = ?
+              AND status = 'Active'
+            ORDER BY start_time ASC
+            `,
+            [groundId]
+        );
+
+        return res.status(200).json({
+            success: true,
+            ground: groundRows[0],
+            slots
+        });
+    } catch (error) {
+        console.error("Student Cricket Slots Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch cricket slots.",
+            error: error.message
+        });
+    }
+};
+
+
+// =====================================================
+// GET SINGLE SLOT
+// =====================================================
+
+const getSlotById = async (req, res) => {
+    try {
+        const { slotId } = req.params;
+
+        const [rows] = await db.query(
+            `
+            SELECT
+                cs.id,
+                cs.ground_id,
+                cs.slot_name,
+                cs.start_time,
+                cs.end_time,
+                cs.price,
+                cs.status,
+                cg.name AS ground_name,
+                cg.location AS ground_location,
+                cg.capacity AS ground_capacity
+            FROM cricket_slots cs
+            INNER JOIN cricket_grounds cg
+                ON cs.ground_id = cg.id
+            WHERE cs.id = ?
+            LIMIT 1
+            `,
+            [slotId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Cricket slot not found."
+            });
+        }
+
+        if (rows[0].status !== "Active") {
+            return res.status(400).json({
+                success: false,
+                message: "This slot is currently inactive."
+            });
+        }
+
+        if (rows[0].ground_capacity === null) {
+            return res.status(200).json({
+                success: true,
+                slot: rows[0]
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            slot: rows[0]
+        });
+    } catch (error) {
+        console.error("Student Cricket Slot Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch cricket slot.",
+            error: error.message
+        });
+    }
+};
+
+
+// =====================================================
+// CREATE CRICKET BOOKING
+// =====================================================
+
+const createBooking = async (req, res) => {
+    let connection;
+
+    try {
+        const studentId = Number(req.user.id);
+
+        const {
+            ground_id,
+            slot_id,
+            booking_date,
+            players = []
+        } = req.body;
+
+        if (!studentId) {
+            return res.status(401).json({
+                success: false,
+                message: "Student authentication required."
+            });
+        }
+
+        if (!ground_id || !slot_id || !booking_date) {
+            return res.status(400).json({
+                success: false,
+                message: "Ground, slot and booking date are required."
+            });
+        }
+
+        if (!Array.isArray(players) || players.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "At least one player is required."
+            });
+        }
+
+        connection = await db.getConnection();
+
+        await connection.beginTransaction();
+
+        // -------------------------------------------------
+        // CHECK STUDENT
+        // -------------------------------------------------
+
+        const [studentRows] = await connection.query(
+            `
+            SELECT
+                id,
+                name,
+                email,
+                mobile
+            FROM students
+            WHERE id = ?
+            LIMIT 1
+            `,
+            [studentId]
+        );
+
+        if (studentRows.length === 0) {
+            await connection.rollback();
+
+            return res.status(404).json({
+                success: false,
+                message: "Student not found."
+            });
+        }
+
+        const student = studentRows[0];
+
+        // -------------------------------------------------
+        // CHECK GROUND + SLOT
+        // -------------------------------------------------
+
+        const [slotRows] = await connection.query(
+            `
+            SELECT
+                cs.id,
+                cs.ground_id,
+                cs.slot_name,
+                cs.start_time,
+                cs.end_time,
+                cs.price,
+                cs.status AS slot_status,
+                cg.name AS ground_name,
+                cg.capacity,
+                cg.status AS ground_status
+            FROM cricket_slots cs
+            INNER JOIN cricket_grounds cg
+                ON cs.ground_id = cg.id
+            WHERE cs.id = ?
+              AND cs.ground_id = ?
+            LIMIT 1
+            `,
+            [slot_id, ground_id]
+        );
+
+        if (slotRows.length === 0) {
+            await connection.rollback();
+
+            return res.status(404).json({
+                success: false,
+                message: "Selected cricket slot not found."
+            });
+        }
+
+        const slot = slotRows[0];
+
+        if (
+            slot.slot_status !== "Active" ||
+            slot.ground_status !== "Active"
+        ) {
+            await connection.rollback();
+
+            return res.status(400).json({
+                success: false,
+                message: "Selected cricket slot is not available."
+            });
+        }
+
+        // -------------------------------------------------
+        // DATE VALIDATION
+        // -------------------------------------------------
+
+        const selectedDate = new Date(`${booking_date}T00:00:00`);
+        const today = new Date();
+
+        today.setHours(0, 0, 0, 0);
+
+        if (
+            Number.isNaN(selectedDate.getTime()) ||
+            selectedDate < today
+        ) {
+            await connection.rollback();
+
+            return res.status(400).json({
+                success: false,
+                message: "Booking date must be today or a future date."
+            });
+        }
+
+        // -------------------------------------------------
+        // CHECK EXISTING BOOKING FOR SAME SLOT
+        // -------------------------------------------------
+
+        const [existingBookings] = await connection.query(
+            `
+            SELECT
+                id
+            FROM cricket_bookings
+            WHERE ground_id = ?
+              AND booking_date = ?
+              AND start_time = ?
+              AND end_time = ?
+              AND booking_status IN ('Pending', 'Confirmed')
+            LIMIT 1
+            `,
+            [
+                ground_id,
+                booking_date,
+                slot.start_time,
+                slot.end_time
+            ]
+        );
+
+        if (existingBookings.length > 0) {
+            await connection.rollback();
+
+            return res.status(409).json({
+                success: false,
+                message: "This slot is already booked for the selected date."
+            });
+        }
+
+        // -------------------------------------------------
+        // PREVENT STUDENT DOUBLE BOOKING
+        // -------------------------------------------------
+
+        const [studentExistingBooking] = await connection.query(
+            `
+            SELECT
+                id
+            FROM cricket_bookings
+            WHERE student_id = ?
+              AND booking_date = ?
+              AND start_time = ?
+              AND end_time = ?
+              AND booking_status IN ('Pending', 'Confirmed')
+            LIMIT 1
+            `,
+            [
+                studentId,
+                booking_date,
+                slot.start_time,
+                slot.end_time
+            ]
+        );
+
+        if (studentExistingBooking.length > 0) {
+            await connection.rollback();
+
+            return res.status(409).json({
+                success: false,
+                message: "You already have a booking for this time slot."
+            });
+        }
+
+        // -------------------------------------------------
+        // TOTAL AMOUNT
+        // -------------------------------------------------
+
+        const totalAmount = Number(slot.price || 0);
+
+        // -------------------------------------------------
+        // CREATE BOOKING
+        // -------------------------------------------------
+
+        const [bookingResult] = await connection.query(
+            `
+            INSERT INTO cricket_bookings
+            (
+                student_id,
+                ground_id,
+                booking_date,
+                start_time,
+                end_time,
+                total_amount,
+                booking_status,
+                payment_status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, 'Pending', 'Pending')
+            `,
+            [
+                studentId,
+                ground_id,
+                booking_date,
+                slot.start_time,
+                slot.end_time,
+                totalAmount
+            ]
+        );
+
+        const bookingId = bookingResult.insertId;
+
+        // -------------------------------------------------
+        // ADD BOOKING STUDENT AS FIRST PLAYER
+        // -------------------------------------------------
+
+        await connection.query(
+            `
+            INSERT INTO cricket_booking_players
+            (
+                booking_id,
+                student_name,
+                student_id,
+                mobile
+            )
+            VALUES (?, ?, ?, ?)
+            `,
+            [
+                bookingId,
+                student.name,
+                String(student.id),
+                student.mobile || null
+            ]
+        );
+
+        // -------------------------------------------------
+        // ADD OTHER PLAYERS
+        // -------------------------------------------------
+
+        for (const player of players) {
+            const playerName = String(player.student_name || "").trim();
+
+            if (!playerName) {
+                continue;
+            }
+
+            const playerId = player.student_id
+                ? String(player.student_id).trim()
+                : null;
+
+            const playerMobile = player.mobile
+                ? String(player.mobile).trim()
+                : null;
+
+            const isSameStudent =
+                playerId &&
+                playerId === String(student.id);
+
+            if (isSameStudent) {
+                continue;
+            }
+
+            await connection.query(
+                `
+                INSERT INTO cricket_booking_players
+                (
+                    booking_id,
+                    student_name,
+                    student_id,
+                    mobile
+                )
+                VALUES (?, ?, ?, ?)
+                `,
+                [
+                    bookingId,
+                    playerName,
+                    playerId,
+                    playerMobile
+                ]
+            );
+        }
+
+        await connection.commit();
+
+        return res.status(201).json({
+            success: true,
+            message: "Cricket booking created successfully.",
+            booking: {
+                id: bookingId,
+                student_id: studentId,
+                student_name: student.name,
+                ground_id: Number(ground_id),
+                ground_name: slot.ground_name,
+                slot_id: Number(slot_id),
+                slot_name: slot.slot_name,
+                booking_date,
+                start_time: slot.start_time,
+                end_time: slot.end_time,
+                total_amount: totalAmount,
+                booking_status: "Pending",
+                payment_status: "Pending"
+            }
+        });
+    } catch (error) {
+        if (connection) {
+            try {
+                await connection.rollback();
+            } catch (rollbackError) {
+                console.error("Cricket Booking Rollback Error:", rollbackError);
+            }
+        }
+
+        console.error("Create Cricket Booking Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to create cricket booking.",
+            error: error.message
+        });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+};
+
+
+// =====================================================
+// GET MY BOOKINGS
+// =====================================================
+
+const getMyBookings = async (req, res) => {
+    try {
+        const studentId = Number(req.user.id);
+
+        const [bookings] = await db.query(
+            `
+            SELECT
+                cb.id,
+                cb.id AS booking_id,
+                cb.student_id,
+                cb.ground_id,
+                cb.booking_date,
+                cb.start_time,
+                cb.end_time,
+                cb.total_amount,
+                cb.booking_status,
+                cb.payment_status,
+                cb.rector_remark,
+                cb.approved_at,
+                cb.rejected_at,
+                cb.created_at,
+                cg.name AS ground_name,
+                cg.location AS ground_location
+            FROM cricket_bookings cb
+            LEFT JOIN cricket_grounds cg
+                ON cb.ground_id = cg.id
+            WHERE cb.student_id = ?
+            ORDER BY cb.created_at DESC
+            `,
+            [studentId]
+        );
+
+        return res.status(200).json({
+            success: true,
+            bookings
+        });
+    } catch (error) {
+        console.error("Get My Cricket Bookings Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch your cricket bookings.",
+            error: error.message
+        });
+    }
+};
+
+
+// =====================================================
+// GET MY BOOKING BY ID
+// =====================================================
+
+const getMyBookingById = async (req, res) => {
+    try {
+        const studentId = Number(req.user.id);
+        const { id } = req.params;
+
+        const [rows] = await db.query(
+            `
+            SELECT
+                cb.id,
+                cb.id AS booking_id,
+                cb.student_id,
+                cb.ground_id,
+                cb.booking_date,
+                cb.start_time,
+                cb.end_time,
+                cb.total_amount,
+                cb.booking_status,
+                cb.payment_status,
+                cb.rector_remark,
+                cb.approved_at,
+                cb.rejected_at,
+                cb.created_at,
+                cg.name AS ground_name,
+                cg.location AS ground_location
+            FROM cricket_bookings cb
+            LEFT JOIN cricket_grounds cg
+                ON cb.ground_id = cg.id
+            WHERE cb.id = ?
+              AND cb.student_id = ?
+            LIMIT 1
+            `,
+            [id, studentId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Booking not found."
+            });
+        }
+
+        const [players] = await db.query(
+            `
+            SELECT
+                id,
+                booking_id,
+                student_name,
+                student_id,
+                mobile
+            FROM cricket_booking_players
+            WHERE booking_id = ?
+            ORDER BY id ASC
+            `,
+            [id]
+        );
+
+        const [qrRows] = await db.query(
+            `
+            SELECT
+                id,
+                booking_id,
+                qr_token,
+                qr_status,
+                generated_at,
+                expires_at,
+                used_at,
+                scan_count
+            FROM cricket_booking_qr
+            WHERE booking_id = ?
+            LIMIT 1
+            `,
+            [id]
+        );
+
+        return res.status(200).json({
+            success: true,
+            booking: rows[0],
+            players,
+            qr: qrRows[0] || null
+        });
+    } catch (error) {
+        console.error("Get My Cricket Booking Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch booking details.",
+            error: error.message
+        });
+    }
+};
+
+
+// =====================================================
+// GET BOOKING PLAYERS
+// =====================================================
+
+const getBookingPlayers = async (req, res) => {
+    try {
+        const studentId = Number(req.user.id);
+        const { id } = req.params;
+
+        const [bookingRows] = await db.query(
+            `
+            SELECT
+                id
+            FROM cricket_bookings
+            WHERE id = ?
+              AND student_id = ?
+            LIMIT 1
+            `,
+            [id, studentId]
+        );
+
+        if (bookingRows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Booking not found."
+            });
+        }
+
+        const [players] = await db.query(
+            `
+            SELECT
+                id,
+                booking_id,
+                student_name,
+                student_id,
+                mobile,
+                created_at
+            FROM cricket_booking_players
+            WHERE booking_id = ?
+            ORDER BY id ASC
+            `,
+            [id]
+        );
+
+        return res.status(200).json({
+            success: true,
+            players
+        });
+    } catch (error) {
+        console.error("Get Cricket Booking Players Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch booking players.",
+            error: error.message
+        });
+    }
+};
+
+
+// =====================================================
+// GET BOOKING QR
+// =====================================================
+
+const getBookingQr = async (req, res) => {
+    try {
+        const studentId = Number(req.user.id);
+        const { id } = req.params;
+
+        const [rows] = await db.query(
+            `
+            SELECT
+                cb.id AS booking_id,
+                cb.booking_status,
+                cb.payment_status,
+                q.id AS qr_id,
+                q.qr_token,
+                q.qr_status,
+                q.generated_at,
+                q.expires_at,
+                q.used_at,
+                q.scan_count
+            FROM cricket_bookings cb
+            LEFT JOIN cricket_booking_qr q
+                ON cb.id = q.booking_id
+            WHERE cb.id = ?
+              AND cb.student_id = ?
+            LIMIT 1
+            `,
+            [id, studentId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Booking not found."
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            qr: rows[0].qr_id ? rows[0] : null
+        });
+    } catch (error) {
+        console.error("Get Cricket Booking QR Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch booking QR.",
+            error: error.message
+        });
+    }
+};
+
+
+// =====================================================
+// EXPORT
+// =====================================================
+
+module.exports = {
+    getGrounds,
+    getGroundSlots,
+    getSlotById,
+    createBooking,
+    getMyBookings,
+    getMyBookingById,
+    getBookingPlayers,
+    getBookingQr
+};

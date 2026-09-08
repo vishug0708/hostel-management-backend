@@ -56,6 +56,7 @@ const rectorSalaryRoutes = require("./routes/rectorSalaryRoutes");
 
 const studentAuthRoutes = require("./routes/studentAuthRoutes");
 const studentRoutes = require("./routes/studentRoutes");
+const studentCricketRoutes = require("./routes/studentCricketRoutes");
 const studentGatePassRoutes = require("./routes/studentGatePassRoutes");
 
 
@@ -282,6 +283,11 @@ app.use(
 app.use(
     "/api/student/gatepass",
     studentGatePassRoutes
+);
+
+app.use(
+    "/api/student/cricket",
+    studentCricketRoutes
 );
 
 

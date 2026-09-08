@@ -346,7 +346,7 @@ const createBooking = async (req, res) => {
               AND booking_date = ?
               AND start_time = ?
               AND end_time = ?
-              AND booking_status IN ('Pending', 'Confirmed')
+              AND booking_status IN ('Pending Approval', 'Confirmed')
             LIMIT 1
             `,
             [
@@ -379,7 +379,7 @@ const createBooking = async (req, res) => {
               AND booking_date = ?
               AND start_time = ?
               AND end_time = ?
-              AND booking_status IN ('Pending', 'Confirmed')
+              AND booking_status IN ('Pending Approval', 'Confirmed')
             LIMIT 1
             `,
             [
@@ -411,19 +411,19 @@ const createBooking = async (req, res) => {
 
         const [bookingResult] = await connection.query(
             `
-            INSERT INTO cricket_bookings
-            (
-                student_id,
-                ground_id,
-                booking_date,
-                start_time,
-                end_time,
-                total_amount,
-                booking_status,
-                payment_status
-            )
-            VALUES (?, ?, ?, ?, ?, ?, 'Pending', 'Pending')
-            `,
+    INSERT INTO cricket_bookings
+    (
+        student_id,
+        ground_id,
+        booking_date,
+        start_time,
+        end_time,
+        total_amount,
+        booking_status,
+        payment_status
+    )
+    VALUES (?, ?, ?, ?, ?, ?, 'Pending Approval', 'Pending')
+    `,
             [
                 studentId,
                 ground_id,
@@ -523,7 +523,7 @@ const createBooking = async (req, res) => {
                 start_time: slot.start_time,
                 end_time: slot.end_time,
                 total_amount: totalAmount,
-                booking_status: "Pending",
+                booking_status: "Pending Approval",
                 payment_status: "Pending"
             }
         });

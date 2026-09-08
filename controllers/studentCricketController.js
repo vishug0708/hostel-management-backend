@@ -1136,13 +1136,15 @@ const verifyPayment = async (req, res) => {
         if (existingPayment.length > 0) {
             await connection.query(
                 `
-                UPDATE cricket_payments
-                SET transaction_id = ?,
-                    payment_method = ?,
-                    paid_at = NOW()
-                WHERE booking_id = ?
-                `,
+        UPDATE cricket_payments
+        SET student_id = ?,
+            transaction_id = ?,
+            payment_method = ?,
+            paid_at = NOW()
+        WHERE booking_id = ?
+        `,
                 [
+                    studentId,
                     razorpay_payment_id,
                     "Razorpay",
                     booking.id
@@ -1151,19 +1153,20 @@ const verifyPayment = async (req, res) => {
         } else {
             await connection.query(
                 `
-                INSERT INTO cricket_payments
-                (
-                    booking_id,
-                    transaction_id,
-                    payment_method,
-                    paid_at
-                )
-                VALUES (?, ?, ?, NOW())
-                `,
+    INSERT INTO cricket_payments
+    (
+        booking_id,
+        student_id,
+        transaction_id,
+        payment_method,
+        paid_at
+    )
+    VALUES (?, ?, ?, 'Razorpay', NOW())
+    `,
                 [
                     booking.id,
-                    razorpay_payment_id,
-                    "Razorpay"
+                    studentId,
+                    payment.id
                 ]
             );
         }

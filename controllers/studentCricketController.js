@@ -1156,19 +1156,20 @@ const verifyPayment = async (req, res) => {
             await connection.query(
                 `
     INSERT INTO cricket_payments
-(
-    booking_id,
-    student_id,
-    amount,
-    transaction_id,
-    payment_method,
-    paid_at
-)
-VALUES (?, ?, ?, ?, 'Razorpay', NOW())
+    (
+        booking_id,
+        student_id,
+        amount,
+        transaction_id,
+        payment_method,
+        paid_at
+    )
+    VALUES (?, ?, ?, ?, 'Razorpay', NOW())
     `,
                 [
                     booking.id,
                     studentId,
+                    Number(booking.total_amount),
                     payment.id
                 ]
             );

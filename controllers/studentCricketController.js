@@ -1187,20 +1187,21 @@ const verifyPayment = async (req, res) => {
             payment_status: "Paid"
         });
     } catch (error) {
-        if (connection) {
-            try {
-                await connection.rollback();
-            } catch (rollbackError) {
-                console.error("Razorpay Payment Rollback Error:", rollbackError);
-            }
-        }
-
-        console.error("Verify Razorpay Payment Error:", error);
+        console.error("Razorpay Payment Verification Error:", error);
+        console.error(
+            "Razorpay Verification Error Details:",
+            error?.error?.description ||
+            error?.description ||
+            error?.message
+        );
 
         return res.status(500).json({
             success: false,
             message: "Payment verification failed.",
-            error: error.message
+            error:
+                error?.error?.description ||
+                error?.description ||
+                error?.message
         });
     } finally {
         if (connection) {

@@ -69,6 +69,8 @@ const staffAuthRoutes = require("./routes/staffAuthRoutes");
 const staffRoutes = require("./routes/staffRoutes");
 const staffSalaryRoutes = require("./routes/staffSalaryRoutes");
 
+const staffCricketRoutes = require("./routes/staffCricketRoutes");
+
 
 // =====================================================
 // SECURITY PROTECTED ROUTES
@@ -305,6 +307,7 @@ app.use("/api/staff", staffRoutes);
 
 app.use("/api/staff/salary", staffSalaryRoutes);
 
+app.use("/api/staff/cricket-box", staffCricketRoutes);
 
 // =====================================================
 // SECURITY PROTECTED ROUTES

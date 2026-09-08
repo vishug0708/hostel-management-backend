@@ -1,3 +1,5 @@
+const crypto = require("crypto");
+const Razorpay = require("razorpay");
 const db = require("../config/database");
 
 // =====================================================
@@ -630,10 +632,16 @@ const getMyBookingById = async (req, res) => {
                 cb.rejected_at,
                 cb.created_at,
                 cg.name AS ground_name,
-                cg.location AS ground_location
+                cg.location AS ground_location,
+                cp.transaction_id,
+                cp.payment_method,
+                cp.paid_at,
+                cp.refunded_at
             FROM cricket_bookings cb
             LEFT JOIN cricket_grounds cg
                 ON cb.ground_id = cg.id
+            LEFT JOIN cricket_payments cp
+                ON cb.id = cp.booking_id
             WHERE cb.id = ?
               AND cb.student_id = ?
             LIMIT 1
@@ -860,6 +868,348 @@ const searchStudents = async (req, res) => {
 };
 
 
+
+// =====================================================
+// CREATE RAZORPAY TEST ORDER
+// =====================================================
+
+const createPaymentOrder = async (req, res) => {
+    try {
+        const studentId = Number(req.user.id);
+        const { id } = req.params;
+
+        if (!studentId) {
+            return res.status(401).json({
+                success: false,
+                message: "Student authentication required."
+            });
+        }
+
+        if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+            return res.status(500).json({
+                success: false,
+                message: "Razorpay test keys are not configured on the server."
+            });
+        }
+
+        const [rows] = await db.query(
+            `
+            SELECT
+                cb.id,
+                cb.student_id,
+                cb.total_amount,
+                cb.booking_status,
+                cb.payment_status,
+                s.name AS student_name,
+                s.email AS student_email,
+                s.mobile AS student_mobile
+            FROM cricket_bookings cb
+            LEFT JOIN students s
+                ON cb.student_id = s.id
+            WHERE cb.id = ?
+              AND cb.student_id = ?
+            LIMIT 1
+            `,
+            [id, studentId]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Booking not found."
+            });
+        }
+
+        const booking = rows[0];
+
+        if (booking.booking_status !== "Confirmed") {
+            return res.status(400).json({
+                success: false,
+                message: "Payment is available only after Rector approval."
+            });
+        }
+
+        if (booking.payment_status === "Paid") {
+            return res.status(400).json({
+                success: false,
+                message: "This booking has already been paid."
+            });
+        }
+
+        const amount = Number(booking.total_amount || 0);
+        const amountInPaise = Math.round(amount * 100);
+
+        if (!Number.isFinite(amountInPaise) || amountInPaise <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid booking amount."
+            });
+        }
+
+        const razorpay = new Razorpay({
+            key_id: process.env.RAZORPAY_KEY_ID,
+            key_secret: process.env.RAZORPAY_KEY_SECRET
+        });
+
+        const order = await razorpay.orders.create({
+            amount: amountInPaise,
+            currency: "INR",
+            receipt: `cricket_${booking.id}_${Date.now()}`,
+            notes: {
+                booking_id: String(booking.id),
+                student_id: String(studentId)
+            }
+        });
+
+        return res.status(200).json({
+            success: true,
+            key_id: process.env.RAZORPAY_KEY_ID,
+            order_id: order.id,
+            amount: order.amount,
+            currency: order.currency,
+            booking_id: booking.id,
+            student: {
+                name: booking.student_name || "",
+                email: booking.student_email || "",
+                mobile: booking.student_mobile || ""
+            }
+        });
+    } catch (error) {
+        console.error("Create Razorpay Order Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to create Razorpay payment order.",
+            error: error.message
+        });
+    }
+};
+
+
+// =====================================================
+// VERIFY RAZORPAY PAYMENT
+// =====================================================
+
+const verifyPayment = async (req, res) => {
+    let connection;
+
+    try {
+        const studentId = Number(req.user.id);
+        const { id } = req.params;
+        const {
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature
+        } = req.body;
+
+        if (!studentId) {
+            return res.status(401).json({
+                success: false,
+                message: "Student authentication required."
+            });
+        }
+
+        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+            return res.status(400).json({
+                success: false,
+                message: "Razorpay payment verification data is incomplete."
+            });
+        }
+
+        if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+            return res.status(500).json({
+                success: false,
+                message: "Razorpay test keys are not configured on the server."
+            });
+        }
+
+        const [bookingRows] = await db.query(
+            `
+            SELECT
+                cb.id,
+                cb.student_id,
+                cb.total_amount,
+                cb.booking_status,
+                cb.payment_status
+            FROM cricket_bookings cb
+            WHERE cb.id = ?
+              AND cb.student_id = ?
+            LIMIT 1
+            `,
+            [id, studentId]
+        );
+
+        if (bookingRows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Booking not found."
+            });
+        }
+
+        const booking = bookingRows[0];
+
+        if (booking.booking_status !== "Confirmed") {
+            return res.status(400).json({
+                success: false,
+                message: "Payment is allowed only for Rector-approved bookings."
+            });
+        }
+
+        if (booking.payment_status === "Paid") {
+            return res.status(200).json({
+                success: true,
+                message: "Payment is already completed.",
+                payment_id: razorpay_payment_id
+            });
+        }
+
+        const razorpay = new Razorpay({
+            key_id: process.env.RAZORPAY_KEY_ID,
+            key_secret: process.env.RAZORPAY_KEY_SECRET
+        });
+
+        // Fetch the order from Razorpay so the server verifies the order
+        // amount/receipt instead of trusting client-supplied amount data.
+        const order = await razorpay.orders.fetch(razorpay_order_id);
+        const expectedAmount = Math.round(Number(booking.total_amount || 0) * 100);
+
+        if (
+            !order ||
+            order.id !== razorpay_order_id ||
+            order.currency !== "INR" ||
+            Number(order.amount) !== expectedAmount ||
+            !String(order.receipt || "").startsWith(`cricket_${booking.id}_`)
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Razorpay order verification failed."
+            });
+        }
+
+        const generatedSignature = crypto
+            .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+            .update(`${order.id}|${razorpay_payment_id}`)
+            .digest("hex");
+
+        if (generatedSignature !== razorpay_signature) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid Razorpay payment signature."
+            });
+        }
+
+        const payment = await razorpay.payments.fetch(razorpay_payment_id);
+
+        if (
+            !payment ||
+            payment.id !== razorpay_payment_id ||
+            payment.order_id !== order.id ||
+            Number(payment.amount) !== expectedAmount ||
+            payment.currency !== "INR"
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Razorpay payment details do not match this booking."
+            });
+        }
+
+        if (payment.status !== "captured") {
+            return res.status(400).json({
+                success: false,
+                message: `Payment is not captured yet. Current status: ${payment.status || "unknown"}.`
+            });
+        }
+
+        connection = await db.getConnection();
+        await connection.beginTransaction();
+
+        const [existingPayment] = await connection.query(
+            `
+            SELECT id, transaction_id
+            FROM cricket_payments
+            WHERE booking_id = ?
+            LIMIT 1
+            `,
+            [booking.id]
+        );
+
+        if (existingPayment.length > 0) {
+            await connection.query(
+                `
+                UPDATE cricket_payments
+                SET transaction_id = ?,
+                    payment_method = ?,
+                    paid_at = NOW()
+                WHERE booking_id = ?
+                `,
+                [
+                    razorpay_payment_id,
+                    "Razorpay",
+                    booking.id
+                ]
+            );
+        } else {
+            await connection.query(
+                `
+                INSERT INTO cricket_payments
+                (
+                    booking_id,
+                    transaction_id,
+                    payment_method,
+                    paid_at
+                )
+                VALUES (?, ?, ?, NOW())
+                `,
+                [
+                    booking.id,
+                    razorpay_payment_id,
+                    "Razorpay"
+                ]
+            );
+        }
+
+        await connection.query(
+            `
+            UPDATE cricket_bookings
+            SET payment_status = 'Paid'
+            WHERE id = ?
+              AND student_id = ?
+            `,
+            [booking.id, studentId]
+        );
+
+        await connection.commit();
+
+        return res.status(200).json({
+            success: true,
+            message: "Payment verified successfully.",
+            payment_id: razorpay_payment_id,
+            payment_status: "Paid"
+        });
+    } catch (error) {
+        if (connection) {
+            try {
+                await connection.rollback();
+            } catch (rollbackError) {
+                console.error("Razorpay Payment Rollback Error:", rollbackError);
+            }
+        }
+
+        console.error("Verify Razorpay Payment Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Payment verification failed.",
+            error: error.message
+        });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+};
+
+
 // =====================================================
 // EXPORT
 // =====================================================
@@ -873,5 +1223,7 @@ module.exports = {
     getMyBookingById,
     getBookingPlayers,
     getBookingQr,
-    searchStudents
+    searchStudents,
+    createPaymentOrder,
+    verifyPayment
 };

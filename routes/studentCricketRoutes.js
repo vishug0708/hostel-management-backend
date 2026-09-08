@@ -10,7 +10,9 @@ const {
     getMyBookingById,
     getBookingPlayers,
     getBookingQr,
-    searchStudents
+    searchStudents,
+    createPaymentOrder,
+    verifyPayment
 } = require("../controllers/studentCricketController");
 
 const router = express.Router();
@@ -24,6 +26,7 @@ router.get(
     authMiddleware,
     getGrounds
 );
+
 
 // =====================================================
 // SLOTS
@@ -41,6 +44,7 @@ router.get(
     getSlotById
 );
 
+
 // =====================================================
 // STUDENT SEARCH
 // =====================================================
@@ -50,6 +54,7 @@ router.get(
     authMiddleware,
     searchStudents
 );
+
 
 // =====================================================
 // BOOKINGS
@@ -83,6 +88,23 @@ router.get(
     "/bookings/:id/qr",
     authMiddleware,
     getBookingQr
+);
+
+
+// =====================================================
+// RAZORPAY TEST MODE PAYMENT
+// =====================================================
+
+router.post(
+    "/bookings/:id/payment/order",
+    authMiddleware,
+    createPaymentOrder
+);
+
+router.post(
+    "/bookings/:id/payment/verify",
+    authMiddleware,
+    verifyPayment
 );
 
 module.exports = router;

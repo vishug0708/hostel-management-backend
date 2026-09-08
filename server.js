@@ -46,6 +46,7 @@ const rectorAuthRoutes = require("./routes/rectorAuthRoutes");
 const rectorRoomRoutes = require("./routes/rectorRoomRoutes");
 const rectorRoomAllocationRoutes = require("./routes/rectorRoomAllocationRoutes");
 const rectorRoomDeAllocationRoutes = require("./routes/rectorRoomDeAllocationRoutes");
+const rectorCricketRoutes = require("./routes/rectorCricketRoutes");
 const rectorGatePassRoutes = require("./routes/rectorGatePassRoutes");
 const rectorSalaryRoutes = require("./routes/rectorSalaryRoutes");
 
@@ -256,6 +257,8 @@ app.use(
     "/api/rector/room_allocation",
     rectorRoomDeAllocationRoutes
 );
+
+app.use("/api/rector/cricket-box", rectorCricketRoutes);
 
 app.use(
     "/api/rector/gatepass",

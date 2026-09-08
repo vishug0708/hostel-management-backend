@@ -1,4 +1,5 @@
 const express = require("express");
+const authMiddleware = require("../middleware/authMiddleware");
 
 const {
     getGrounds,
@@ -14,16 +15,15 @@ const {
 
 const router = express.Router();
 
-
 // =====================================================
 // GROUNDS
 // =====================================================
 
 router.get(
     "/grounds",
+    authMiddleware,
     getGrounds
 );
-
 
 // =====================================================
 // SLOTS
@@ -31,11 +31,13 @@ router.get(
 
 router.get(
     "/grounds/:groundId/slots",
+    authMiddleware,
     getGroundSlots
 );
 
 router.get(
     "/slots/:slotId",
+    authMiddleware,
     getSlotById
 );
 
@@ -45,9 +47,9 @@ router.get(
 
 router.get(
     "/students/search",
+    authMiddleware,
     searchStudents
 );
-
 
 // =====================================================
 // BOOKINGS
@@ -55,28 +57,32 @@ router.get(
 
 router.post(
     "/bookings",
+    authMiddleware,
     createBooking
 );
 
 router.get(
     "/bookings",
+    authMiddleware,
     getMyBookings
 );
 
 router.get(
     "/bookings/:id",
+    authMiddleware,
     getMyBookingById
 );
 
 router.get(
     "/bookings/:id/players",
+    authMiddleware,
     getBookingPlayers
 );
 
 router.get(
     "/bookings/:id/qr",
+    authMiddleware,
     getBookingQr
 );
-
 
 module.exports = router;

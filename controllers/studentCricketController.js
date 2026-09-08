@@ -1138,6 +1138,7 @@ const verifyPayment = async (req, res) => {
                 `
         UPDATE cricket_payments
         SET student_id = ?,
+            amount = ?,
             transaction_id = ?,
             payment_method = ?,
             paid_at = NOW()
@@ -1145,6 +1146,7 @@ const verifyPayment = async (req, res) => {
         `,
                 [
                     studentId,
+                    Number(booking.total_amount),
                     razorpay_payment_id,
                     "Razorpay",
                     booking.id
@@ -1154,14 +1156,15 @@ const verifyPayment = async (req, res) => {
             await connection.query(
                 `
     INSERT INTO cricket_payments
-    (
-        booking_id,
-        student_id,
-        transaction_id,
-        payment_method,
-        paid_at
-    )
-    VALUES (?, ?, ?, 'Razorpay', NOW())
+(
+    booking_id,
+    student_id,
+    amount,
+    transaction_id,
+    payment_method,
+    paid_at
+)
+VALUES (?, ?, ?, ?, 'Razorpay', NOW())
     `,
                 [
                     booking.id,

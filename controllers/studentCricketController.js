@@ -285,6 +285,21 @@ const createBooking = async (req, res) => {
 
         const slot = slotRows[0];
 
+        // -------------------------------------------------
+        // CHECK PLAYER CAPACITY
+        // -------------------------------------------------
+
+        const capacity = Number(slot.capacity || 0);
+
+        if (capacity > 0 && players.length > capacity) {
+            await connection.rollback();
+
+            return res.status(400).json({
+                success: false,
+                message: `Maximum ${capacity} students are allowed for this cricket box.`
+            });
+        }
+
         if (
             slot.slot_status !== "Active" ||
             slot.ground_status !== "Active"
@@ -798,6 +813,52 @@ const getBookingQr = async (req, res) => {
     }
 };
 
+// =====================================================
+// SEARCH STUDENTS FOR CRICKET BOOKING
+// =====================================================
+
+const searchStudents = async (req, res) => {
+    try {
+        const { name } = req.query;
+
+        if (!name || name.trim().length < 2) {
+            return res.status(200).json({
+                success: true,
+                students: []
+            });
+        }
+
+        const searchName = `%${name.trim()}%`;
+
+        const [students] = await db.query(
+            `
+            SELECT
+                id,
+                name,
+                mobile
+            FROM students
+            WHERE name LIKE ?
+            ORDER BY name ASC
+            LIMIT 10
+            `,
+            [searchName]
+        );
+
+        return res.status(200).json({
+            success: true,
+            students
+        });
+    } catch (error) {
+        console.error("Search Cricket Students Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to search students.",
+            error: error.message
+        });
+    }
+};
+
 
 // =====================================================
 // EXPORT
@@ -811,5 +872,6 @@ module.exports = {
     getMyBookings,
     getMyBookingById,
     getBookingPlayers,
-    getBookingQr
+    getBookingQr,
+    searchStudents
 };

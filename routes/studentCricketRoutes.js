@@ -8,7 +8,8 @@ const {
     getMyBookings,
     getMyBookingById,
     getBookingPlayers,
-    getBookingQr
+    getBookingQr,
+    searchStudents
 } = require("../controllers/studentCricketController");
 
 const router = express.Router();
@@ -36,6 +37,15 @@ router.get(
 router.get(
     "/slots/:slotId",
     getSlotById
+);
+
+// =====================================================
+// STUDENT SEARCH
+// =====================================================
+
+router.get(
+    "/students/search",
+    searchStudents
 );
 
 

@@ -1267,21 +1267,30 @@ const verifyPayment = async (req, res) => {
 
             await connection.query(
                 `
-        UPDATE cricket_booking_qr
-        SET qr_status = 'Active',
-            expires_at = STR_TO_DATE(
+    UPDATE cricket_booking_qr
+    SET qr_status = 'Active',
+        expires_at = DATE_ADD(
+            STR_TO_DATE(
                 CONCAT(
                     DATE_FORMAT(?, '%Y-%m-%d'),
                     ' ',
                     TIME_FORMAT(?, '%H:%i:%s')
                 ),
                 '%Y-%m-%d %H:%i:%s'
-            )
-        WHERE booking_id = ?
-        `,
+            ),
+            INTERVAL IF(
+                TIME(?) <= TIME(?),
+                1,
+                0
+            ) DAY
+        )
+    WHERE booking_id = ?
+    `,
                 [
                     booking.booking_date,
                     booking.end_time,
+                    booking.end_time,
+                    booking.start_time,
                     booking.id
                 ]
             );
@@ -1290,17 +1299,18 @@ const verifyPayment = async (req, res) => {
 
             await connection.query(
                 `
-        INSERT INTO cricket_booking_qr
-        (
-            booking_id,
-            qr_token,
-            qr_status,
-            expires_at
-        )
-        VALUES (
-            ?,
-            ?,
-            'Active',
+    INSERT INTO cricket_booking_qr
+    (
+        booking_id,
+        qr_token,
+        qr_status,
+        expires_at
+    )
+    VALUES (
+        ?,
+        ?,
+        'Active',
+        DATE_ADD(
             STR_TO_DATE(
                 CONCAT(
                     DATE_FORMAT(?, '%Y-%m-%d'),
@@ -1308,14 +1318,22 @@ const verifyPayment = async (req, res) => {
                     TIME_FORMAT(?, '%H:%i:%s')
                 ),
                 '%Y-%m-%d %H:%i:%s'
-            )
+            ),
+            INTERVAL IF(
+                TIME(?) <= TIME(?),
+                1,
+                0
+            ) DAY
         )
-        `,
+    )
+    `,
                 [
                     booking.id,
                     qrToken,
                     booking.booking_date,
-                    booking.end_time
+                    booking.end_time,
+                    booking.end_time,
+                    booking.start_time
                 ]
             );
         }

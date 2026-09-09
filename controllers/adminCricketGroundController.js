@@ -142,6 +142,17 @@ const addGround = async (req, res) => {
             });
         }
 
+        if (
+            opening_time &&
+            closing_time &&
+            opening_time === closing_time
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Opening time and closing time cannot be the same."
+            });
+        }
+
         const sql = `
             INSERT INTO cricket_grounds
             (
@@ -237,6 +248,17 @@ const updateGround = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "Capacity must be greater than 0."
+            });
+        }
+
+        if (
+            opening_time &&
+            closing_time &&
+            opening_time === closing_time
+        ) {
+            return res.status(400).json({
+                success: false,
+                message: "Opening time and closing time cannot be the same."
             });
         }
 

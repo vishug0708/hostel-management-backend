@@ -164,40 +164,30 @@ const scanCricketQr = async (req, res) => {
             `
             SELECT
                 q.id AS qr_id,
-                q.booking_id,
+                q.booking_id AS booking_id,
                 q.qr_token,
                 q.qr_status,
                 q.expires_at,
-
                 b.student_id,
-                b.booking_date,
-                b.start_time,
+                DATE_FORMAT(b.booking_date, '%Y-%m-%d') AS booking_date,
                 b.end_time,
-                b.booking_status,
+                b.start_time,
                 b.payment_status,
-
+                b.booking_status,
                 s.name AS student_name,
                 s.mobile AS student_mobile,
-
                 cg.name AS ground_name
-
-            FROM cricket_booking_qr q
-
-            INNER JOIN cricket_bookings b
+                FROM cricket_booking_qr q
+                INNER JOIN cricket_bookings b
                 ON b.id = q.booking_id
-
-            INNER JOIN students s
+                INNER JOIN students s
                 ON s.id = b.student_id
-
-            INNER JOIN cricket_grounds cg
+                INNER JOIN cricket_grounds cg
                 ON cg.id = b.ground_id
-
-            WHERE q.qr_token = ?
-
-            LIMIT 1
-
-            FOR UPDATE
-            `,
+                WHERE q.qr_token = ?
+                LIMIT 1
+                FOR UPDATE
+                `,
             [qrToken]
         );
 
@@ -259,28 +249,35 @@ const scanCricketQr = async (req, res) => {
 
         const year = indiaDateParts.find(
             (part) => part.type === "year"
-        ).value;
+        )?.value;
 
         const month = indiaDateParts.find(
             (part) => part.type === "month"
-        ).value;
+        )?.value;
 
         const day = indiaDateParts.find(
             (part) => part.type === "day"
-        ).value;
+        )?.value;
 
-        const today =
-            `${year}-${month}-${day}`;
+        const today = `${year}-${month}-${day}`;
 
-        const bookingDate =
-            String(booking.booking_date)
-                .slice(0, 10);
+        // booking_date is already returned by MySQL
+        // as YYYY-MM-DD because of DATE_FORMAT().
+        const bookingDate = String(
+            booking.booking_date || ""
+        ).trim();
 
-        console.log("India Today:", today);
+        console.log(
+            "India Today:",
+            today
+        );
+
         console.log(
             "Booking Date:",
             bookingDate
         );
+
+
         // =================================================
         // QR VALIDATION
         // =================================================

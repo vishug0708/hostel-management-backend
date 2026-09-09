@@ -48,12 +48,20 @@ const getGrounds = async (req, res) => {
 const getGroundSlots = async (req, res) => {
     try {
         const { groundId } = req.params;
+        const { date } = req.query;
 
         const [groundRows] = await db.query(
             `
             SELECT
                 id,
                 name,
+                location,
+                description,
+                capacity,
+                price_per_hour,
+                opening_time,
+                closing_time,
+                slot_duration,
                 status
             FROM cricket_grounds
             WHERE id = ?
@@ -76,29 +84,64 @@ const getGroundSlots = async (req, res) => {
             });
         }
 
+        /*
+         * If date is provided:
+         * Check whether this slot already has
+         * Pending Approval / Confirmed booking.
+         */
         const [slots] = await db.query(
             `
             SELECT
-                id,
-                ground_id,
-                slot_name,
-                start_time,
-                end_time,
-                price,
-                status
-            FROM cricket_slots
-            WHERE ground_id = ?
-              AND status = 'Active'
-            ORDER BY start_time ASC
+                cs.id,
+                cs.ground_id,
+                cs.slot_name,
+                cs.start_time,
+                cs.end_time,
+                cs.price,
+                cs.status,
+
+                CASE
+                    WHEN cb.id IS NULL THEN 1
+                    ELSE 0
+                END AS is_available,
+
+                CASE
+                    WHEN cb.id IS NULL THEN 'Available'
+                    ELSE 'Unavailable'
+                END AS availability_status,
+
+                CASE
+                    WHEN cb.id IS NULL THEN NULL
+                    ELSE 'This slot is already booked.'
+                END AS unavailable_reason
+
+            FROM cricket_slots cs
+
+            LEFT JOIN cricket_bookings cb
+                ON cb.ground_id = cs.ground_id
+                AND cb.booking_date = ?
+                AND cb.start_time = cs.start_time
+                AND cb.end_time = cs.end_time
+                AND cb.booking_status IN (
+                    'Pending Approval',
+                    'Confirmed'
+                )
+
+            WHERE cs.ground_id = ?
+              AND cs.status = 'Active'
+
+            ORDER BY cs.start_time ASC
             `,
-            [groundId]
+            [date || null, groundId]
         );
 
         return res.status(200).json({
             success: true,
             ground: groundRows[0],
+            booking_date: date || null,
             slots
         });
+
     } catch (error) {
         console.error("Student Cricket Slots Error:", error);
 

@@ -129,6 +129,7 @@ const getCricketStats = async (req, res) => {
 
 // =====================================================
 // SCAN AND VERIFY CRICKET BOOKING QR
+// ENTRY + EXIT
 // =====================================================
 
 const scanCricketQr = async (req, res) => {
@@ -168,26 +169,42 @@ const scanCricketQr = async (req, res) => {
                 q.qr_token,
                 q.qr_status,
                 q.expires_at,
+                q.scan_count,
+
                 b.student_id,
-                DATE_FORMAT(b.booking_date, '%Y-%m-%d') AS booking_date,
-                b.end_time,
+
+                DATE_FORMAT(
+                    b.booking_date,
+                    '%Y-%m-%d'
+                ) AS booking_date,
+
                 b.start_time,
+                b.end_time,
                 b.payment_status,
                 b.booking_status,
+
                 s.name AS student_name,
                 s.mobile AS student_mobile,
+
                 cg.name AS ground_name
-                FROM cricket_booking_qr q
-                INNER JOIN cricket_bookings b
+
+            FROM cricket_booking_qr q
+
+            INNER JOIN cricket_bookings b
                 ON b.id = q.booking_id
-                INNER JOIN students s
+
+            INNER JOIN students s
                 ON s.id = b.student_id
-                INNER JOIN cricket_grounds cg
+
+            INNER JOIN cricket_grounds cg
                 ON cg.id = b.ground_id
-                WHERE q.qr_token = ?
-                LIMIT 1
-                FOR UPDATE
-                `,
+
+            WHERE q.qr_token = ?
+
+            LIMIT 1
+
+            FOR UPDATE
+            `,
             [qrToken]
         );
 
@@ -198,23 +215,23 @@ const scanCricketQr = async (req, res) => {
         if (rows.length === 0) {
             await connection.query(
                 `
-        INSERT INTO cricket_booking_qr_logs
-        (
-            booking_id,
-            qr_id,
-            scanned_by,
-            scan_status,
-            remarks
-        )
-        VALUES
-        (
-            NULL,
-            NULL,
-            ?,
-            'Invalid',
-            ?
-        )
-        `,
+                INSERT INTO cricket_booking_qr_logs
+                (
+                    booking_id,
+                    qr_id,
+                    scanned_by,
+                    scan_status,
+                    remarks
+                )
+                VALUES
+                (
+                    NULL,
+                    NULL,
+                    ?,
+                    'Invalid',
+                    ?
+                )
+                `,
                 [
                     staffId,
                     "QR token not found."
@@ -229,6 +246,7 @@ const scanCricketQr = async (req, res) => {
                 scan_status: "Invalid"
             });
         }
+
         const booking = rows[0];
 
         // =================================================
@@ -237,49 +255,45 @@ const scanCricketQr = async (req, res) => {
 
         const now = new Date();
 
-        const indiaDateParts = new Intl.DateTimeFormat(
-            "en-US",
-            {
-                timeZone: "Asia/Kolkata",
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit"
-            }
-        ).formatToParts(now);
+        const indiaDateParts =
+            new Intl.DateTimeFormat(
+                "en-US",
+                {
+                    timeZone: "Asia/Kolkata",
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit"
+                }
+            ).formatToParts(now);
 
-        const year = indiaDateParts.find(
-            (part) => part.type === "year"
-        )?.value;
+        const year =
+            indiaDateParts.find(
+                (part) =>
+                    part.type === "year"
+            )?.value;
 
-        const month = indiaDateParts.find(
-            (part) => part.type === "month"
-        )?.value;
+        const month =
+            indiaDateParts.find(
+                (part) =>
+                    part.type === "month"
+            )?.value;
 
-        const day = indiaDateParts.find(
-            (part) => part.type === "day"
-        )?.value;
+        const day =
+            indiaDateParts.find(
+                (part) =>
+                    part.type === "day"
+            )?.value;
 
-        const today = `${year}-${month}-${day}`;
+        const today =
+            `${year}-${month}-${day}`;
 
-        // booking_date is already returned by MySQL
-        // as YYYY-MM-DD because of DATE_FORMAT().
-        const bookingDate = String(
-            booking.booking_date || ""
-        ).trim();
-
-        console.log(
-            "India Today:",
-            today
-        );
-
-        console.log(
-            "Booking Date:",
-            bookingDate
-        );
-
+        const bookingDate =
+            String(
+                booking.booking_date || ""
+            ).trim();
 
         // =================================================
-        // QR VALIDATION
+        // BASIC VALIDATION
         // =================================================
 
         let scanStatus = "Valid";
@@ -288,35 +302,10 @@ const scanCricketQr = async (req, res) => {
             "QR verified successfully.";
 
         // -------------------------------------------------
-        // CHECK QR USED
+        // QR EXPIRED
         // -------------------------------------------------
 
-        if (booking.qr_status === "Used") {
-            scanStatus = "Already Used";
-
-            remarks =
-                "QR code has already been used.";
-        }
-
-        // -------------------------------------------------
-        // CHECK QR STATUS
-        // -------------------------------------------------
-
-        else if (booking.qr_status !== "Active") {
-            scanStatus =
-                booking.qr_status === "Expired"
-                    ? "Expired"
-                    : "Rejected";
-
-            remarks =
-                `QR status is ${booking.qr_status}.`;
-        }
-
-        // -------------------------------------------------
-        // CHECK QR EXPIRY
-        // -------------------------------------------------
-
-        else if (
+        if (
             booking.expires_at &&
             new Date(booking.expires_at) < now
         ) {
@@ -336,10 +325,25 @@ const scanCricketQr = async (req, res) => {
         }
 
         // -------------------------------------------------
-        // CHECK BOOKING DATE
+        // QR REVOKED
         // -------------------------------------------------
 
-        else if (bookingDate !== today) {
+        else if (
+            booking.qr_status === "Revoked"
+        ) {
+            scanStatus = "Rejected";
+
+            remarks =
+                "QR code has been revoked.";
+        }
+
+        // -------------------------------------------------
+        // BOOKING DATE CHECK
+        // -------------------------------------------------
+
+        else if (
+            bookingDate !== today
+        ) {
             scanStatus = "Rejected";
 
             remarks =
@@ -347,11 +351,12 @@ const scanCricketQr = async (req, res) => {
         }
 
         // -------------------------------------------------
-        // CHECK BOOKING STATUS
+        // BOOKING STATUS CHECK
         // -------------------------------------------------
 
         else if (
-            booking.booking_status !== "Confirmed"
+            booking.booking_status !==
+            "Confirmed"
         ) {
             scanStatus = "Rejected";
 
@@ -360,7 +365,7 @@ const scanCricketQr = async (req, res) => {
         }
 
         // -------------------------------------------------
-        // CHECK PAYMENT STATUS
+        // PAYMENT CHECK
         // -------------------------------------------------
 
         else if (
@@ -370,6 +375,74 @@ const scanCricketQr = async (req, res) => {
 
             remarks =
                 "Payment has not been completed.";
+        }
+
+        // =================================================
+        // GET PREVIOUS VALID SCANS
+        // =================================================
+
+        let validScanCount = 0;
+
+        if (scanStatus === "Valid") {
+            const [validScans] =
+                await connection.query(
+                    `
+                    SELECT
+                        id,
+                        scanned_at,
+                        remarks
+                    FROM cricket_booking_qr_logs
+                    WHERE booking_id = ?
+                      AND qr_id = ?
+                      AND scan_status = 'Valid'
+                    ORDER BY scanned_at ASC
+                    `,
+                    [
+                        booking.booking_id,
+                        booking.qr_id
+                    ]
+                );
+
+            validScanCount =
+                validScans.length;
+        }
+
+        // =================================================
+        // ENTRY
+        // =================================================
+
+        if (
+            scanStatus === "Valid" &&
+            validScanCount === 0
+        ) {
+            remarks =
+                "ENTRY ALLOWED. Student is allowed to enter the cricket box.";
+        }
+
+        // =================================================
+        // EXIT
+        // =================================================
+
+        else if (
+            scanStatus === "Valid" &&
+            validScanCount === 1
+        ) {
+            remarks =
+                "EXIT ALLOWED. Student is allowed to exit the cricket box.";
+        }
+
+        // =================================================
+        // THIRD OR MORE VALID SCAN
+        // =================================================
+
+        else if (
+            scanStatus === "Valid" &&
+            validScanCount >= 2
+        ) {
+            scanStatus = "Rejected";
+
+            remarks =
+                "Entry and exit have already been completed for this booking.";
         }
 
         // =================================================
@@ -412,7 +485,8 @@ const scanCricketQr = async (req, res) => {
             `
             UPDATE cricket_booking_qr
             SET
-                scan_count = scan_count + 1,
+                scan_count =
+                    scan_count + 1,
                 scanned_by = ?
             WHERE id = ?
             `,
@@ -423,10 +497,18 @@ const scanCricketQr = async (req, res) => {
         );
 
         // =================================================
+        // FIRST VALID SCAN
         // MARK QR AS USED
+        //
+        // IMPORTANT:
+        // QR remains "Used" so we know entry happened.
+        // Second valid scan is treated as EXIT.
         // =================================================
 
-        if (scanStatus === "Valid") {
+        if (
+            scanStatus === "Valid" &&
+            validScanCount === 0
+        ) {
             await connection.query(
                 `
                 UPDATE cricket_booking_qr
@@ -442,7 +524,7 @@ const scanCricketQr = async (req, res) => {
         await connection.commit();
 
         // =================================================
-        // BOOKING RESPONSE
+        // RESPONSE BOOKING
         // =================================================
 
         const responseBooking = {
@@ -475,31 +557,78 @@ const scanCricketQr = async (req, res) => {
         };
 
         // =================================================
-        // ENTRY DENIED
+        // DENIED
         // =================================================
 
         if (scanStatus !== "Valid") {
             return res.status(400).json({
                 success: false,
+
                 message: remarks,
+
                 scan_status: scanStatus,
+
+                action: "DENIED",
+
                 booking: responseBooking
             });
         }
 
         // =================================================
-        // ENTRY ALLOWED
+        // ENTRY
         // =================================================
 
-        return res.json({
-            success: true,
-            message:
-                "QR verified successfully. Entry allowed.",
+        if (validScanCount === 0) {
+            return res.json({
+                success: true,
 
-            scan_status: "Valid",
+                message:
+                    "ENTRY ALLOWED. Student may enter the cricket box.",
+
+                scan_status: "Valid",
+
+                action: "ENTRY",
+
+                booking: responseBooking
+            });
+        }
+
+        // =================================================
+        // EXIT
+        // =================================================
+
+        if (validScanCount === 1) {
+            return res.json({
+                success: true,
+
+                message:
+                    "EXIT ALLOWED. Student may exit the cricket box.",
+
+                scan_status: "Valid",
+
+                action: "EXIT",
+
+                booking: responseBooking
+            });
+        }
+
+        // =================================================
+        // FALLBACK
+        // =================================================
+
+        return res.status(400).json({
+            success: false,
+
+            message:
+                "Entry and exit have already been completed.",
+
+            scan_status: "Rejected",
+
+            action: "DENIED",
 
             booking: responseBooking
         });
+
     } catch (error) {
         if (connection) {
             try {
@@ -519,11 +648,14 @@ const scanCricketQr = async (req, res) => {
 
         return res.status(500).json({
             success: false,
+
             message:
                 "Unable to verify QR code.",
 
-            error: error.message
+            error:
+                error.message
         });
+
     } finally {
         if (connection) {
             connection.release();

@@ -673,27 +673,31 @@ const getMyBookingById = async (req, res) => {
 
         const [qrRows] = await db.query(
             `
-            SELECT
-                id,
-                booking_id,
-                qr_token,
-                qr_status,
-                generated_at,
-                expires_at,
-                used_at,
-                scan_count
-            FROM cricket_booking_qr
-            WHERE booking_id = ?
-            LIMIT 1
-            `,
+    SELECT
+        id,
+        booking_id,
+        qr_token,
+        qr_status,
+        generated_at,
+        expires_at,
+        used_at,
+        scan_count
+    FROM cricket_booking_qr
+    WHERE booking_id = ?
+    LIMIT 1
+    `,
             [id]
         );
+
+        const qrAllowed =
+            rows[0].booking_status === "Confirmed" &&
+            rows[0].payment_status === "Paid";
 
         return res.status(200).json({
             success: true,
             booking: rows[0],
             players,
-            qr: qrRows[0] || null
+            qr: qrAllowed ? (qrRows[0] || null) : null
         });
     } catch (error) {
         console.error("Get My Cricket Booking Error:", error);
@@ -806,10 +810,17 @@ const getBookingQr = async (req, res) => {
             });
         }
 
+        const booking = rows[0];
+
+        const qrAllowed =
+            booking.booking_status === "Confirmed" &&
+            booking.payment_status === "Paid";
+
         return res.status(200).json({
             success: true,
-            qr: rows[0].qr_id ? rows[0] : null
+            qr: qrAllowed && booking.qr_id ? booking : null
         });
+
     } catch (error) {
         console.error("Get Cricket Booking QR Error:", error);
 
@@ -840,15 +851,16 @@ const searchStudents = async (req, res) => {
 
         const [students] = await db.query(
             `
-            SELECT
-                id,
-                name,
-                mobile
-            FROM students
-            WHERE name LIKE ?
-            ORDER BY name ASC
-            LIMIT 10
-            `,
+    SELECT
+        id,
+        id AS student_id,
+        name,
+        mobile
+    FROM students
+    WHERE name LIKE ?
+    ORDER BY name ASC
+    LIMIT 10
+    `,
             [searchName]
         );
 
@@ -1025,17 +1037,20 @@ const verifyPayment = async (req, res) => {
 
         const [bookingRows] = await db.query(
             `
-            SELECT
-                cb.id,
-                cb.student_id,
-                cb.total_amount,
-                cb.booking_status,
-                cb.payment_status
-            FROM cricket_bookings cb
-            WHERE cb.id = ?
-              AND cb.student_id = ?
-            LIMIT 1
-            `,
+    SELECT
+        cb.id,
+        cb.student_id,
+        cb.booking_date,
+        cb.start_time,
+        cb.end_time,
+        cb.total_amount,
+        cb.booking_status,
+        cb.payment_status
+    FROM cricket_bookings cb
+    WHERE cb.id = ?
+      AND cb.student_id = ?
+    LIMIT 1
+    `,
             [id, studentId]
         );
 

@@ -208,23 +208,23 @@ const scanCricketQr = async (req, res) => {
         if (rows.length === 0) {
             await connection.query(
                 `
-                INSERT INTO cricket_booking_qr_logs
-                (
-                    booking_id,
-                    qr_id,
-                    scanned_by,
-                    scan_status,
-                    remarks
-                )
-                VALUES
-                (
-                    0,
-                    0,
-                    ?,
-                    'Invalid',
-                    ?
-                )
-                `,
+        INSERT INTO cricket_booking_qr_logs
+        (
+            booking_id,
+            qr_id,
+            scanned_by,
+            scan_status,
+            remarks
+        )
+        VALUES
+        (
+            NULL,
+            NULL,
+            ?,
+            'Invalid',
+            ?
+        )
+        `,
                 [
                     staffId,
                     "QR token not found."
@@ -239,7 +239,6 @@ const scanCricketQr = async (req, res) => {
                 scan_status: "Invalid"
             });
         }
-
         const booking = rows[0];
 
         // =================================================

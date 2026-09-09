@@ -247,20 +247,40 @@ const scanCricketQr = async (req, res) => {
 
         const now = new Date();
 
-        const today = new Intl.DateTimeFormat(
-            "en-CA",
+        const indiaDateParts = new Intl.DateTimeFormat(
+            "en-US",
             {
                 timeZone: "Asia/Kolkata",
                 year: "numeric",
                 month: "2-digit",
                 day: "2-digit"
             }
-        ).format(now);
+        ).formatToParts(now);
 
-        const bookingDate = String(
-            booking.booking_date
-        ).slice(0, 10);
+        const year = indiaDateParts.find(
+            (part) => part.type === "year"
+        ).value;
 
+        const month = indiaDateParts.find(
+            (part) => part.type === "month"
+        ).value;
+
+        const day = indiaDateParts.find(
+            (part) => part.type === "day"
+        ).value;
+
+        const today =
+            `${year}-${month}-${day}`;
+
+        const bookingDate =
+            String(booking.booking_date)
+                .slice(0, 10);
+
+        console.log("India Today:", today);
+        console.log(
+            "Booking Date:",
+            bookingDate
+        );
         // =================================================
         // QR VALIDATION
         // =================================================

@@ -91,50 +91,57 @@ const getGroundSlots = async (req, res) => {
          */
         const [slots] = await db.query(
             `
-            SELECT
-                cs.id,
-                cs.ground_id,
-                cs.slot_name,
-                cs.start_time,
-                cs.end_time,
-                cs.price,
-                cs.status,
+    SELECT
+        cs.id,
+        cs.ground_id,
+        cs.slot_name,
+        cs.start_time,
+        cs.end_time,
+        cs.price,
+        cs.status,
 
-                CASE
-                    WHEN cb.id IS NULL THEN 1
-                    ELSE 0
-                END AS is_available,
+        CASE
+            WHEN cb.id IS NULL THEN 1
+            ELSE 0
+        END AS is_available,
 
-                CASE
-                    WHEN cb.id IS NULL THEN 'Available'
-                    ELSE 'Unavailable'
-                END AS availability_status,
+        CASE
+            WHEN cb.id IS NULL THEN 'Available'
+            ELSE 'Unavailable'
+        END AS availability_status,
 
-                CASE
-                    WHEN cb.id IS NULL THEN NULL
-                    ELSE 'This slot is already booked.'
-                END AS unavailable_reason
+        CASE
+            WHEN cb.id IS NULL THEN NULL
+            ELSE 'This slot is already booked.'
+        END AS unavailable_reason
 
-            FROM cricket_slots cs
+    FROM cricket_slots cs
 
-            LEFT JOIN cricket_bookings cb
-                ON cb.ground_id = cs.ground_id
-                AND cb.booking_date = ?
-                AND cb.start_time = cs.start_time
-                AND cb.end_time = cs.end_time
-                AND cb.booking_status IN (
-                    'Pending Approval',
-                    'Confirmed'
-                )
+    INNER JOIN cricket_grounds ground
+        ON ground.id = cs.ground_id
 
-            WHERE cs.ground_id = ?
-              AND cs.status = 'Active'
+    LEFT JOIN cricket_bookings cb
+        ON cb.ground_id = cs.ground_id
+        AND cb.booking_date = ?
+        AND cb.start_time = cs.start_time
+        AND cb.end_time = cs.end_time
+        AND cb.booking_status IN (
+            'Pending Approval',
+            'Confirmed'
+        )
 
-            ORDER BY cs.start_time ASC
-            `,
+    WHERE cs.ground_id = ?
+      AND cs.status = 'Active'
+
+    ORDER BY
+        CASE
+            WHEN TIME(cs.start_time) < TIME(ground.opening_time)
+            THEN TIME_TO_SEC(cs.start_time) + 86400
+            ELSE TIME_TO_SEC(cs.start_time)
+        END ASC
+    `,
             [date || null, groundId]
         );
-
         return res.status(200).json({
             success: true,
             ground: groundRows[0],

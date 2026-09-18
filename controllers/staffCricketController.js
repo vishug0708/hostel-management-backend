@@ -160,7 +160,9 @@ const makeIndiaDate = (date, time) => {
     const cleanDate = String(date || "").slice(0, 10);
     const cleanTime = String(time || "00:00:00").slice(0, 8);
 
-    return new Date(`${cleanDate}T${cleanTime}+05:30`);
+    return new Date(
+        `${cleanDate}T${cleanTime}+05:30`
+    );
 };
 
 const scanCricketQr = async (req, res) => {
@@ -331,69 +333,108 @@ const scanCricketQr = async (req, res) => {
             const isOvernight =
                 bookingEndTime <= bookingStartTime;
 
-            const endDate = isOvernight
-                ? (() => {
-                    const date = new Date(
-                        `${bookingDate}T00:00:00+05:30`
-                    );
-                    date.setUTCDate(date.getUTCDate() + 1);
-                    return date.toISOString().slice(0, 10);
-                })()
-                : bookingDate;
+            let endDate = bookingDate;
+
+            if (isOvernight) {
+                const nextDate = new Date(
+                    `${bookingDate}T00:00:00+05:30`
+                );
+
+                nextDate.setUTCDate(
+                    nextDate.getUTCDate() + 1
+                );
+
+                endDate = nextDate
+                    .toISOString()
+                    .slice(0, 10);
+            }
 
             const endDateTime = makeIndiaDate(
                 endDate,
                 bookingEndTime
             );
 
-            // Before booking starts
-            if (now < startDateTime) {
+            /*
+             * IMPORTANT:
+             * Always compare actual India time.
+             */
+
+            const currentTime = india.time;
+
+            const currentDateTime = makeIndiaDate(
+                today,
+                currentTime
+            );
+
+            // =============================================
+            // BEFORE BOOKING START
+            // =============================================
+
+            if (currentDateTime < startDateTime) {
                 scanStatus = "Rejected";
-                remarks = "QR code is not active yet. Booking has not started.";
+
+                remarks =
+                    `QR code is not active yet. Booking starts at ${bookingStartTime.slice(0, 5)}.`;
             }
 
-            // At or after booking end
-            else if (now >= endDateTime) {
+            // =============================================
+            // BOOKING EXPIRED
+            // =============================================
+
+            else if (currentDateTime >= endDateTime) {
                 scanStatus = "Expired";
-                remarks = "QR code has expired.";
+
+                remarks =
+                    "QR code has expired.";
 
                 await connection.query(
                     `
-                    UPDATE cricket_booking_qr
-                    SET qr_status = 'Expired'
-                    WHERE id = ?
-                    `,
+            UPDATE cricket_booking_qr
+            SET qr_status = 'Expired'
+            WHERE id = ?
+            `,
                     [booking.qr_id]
                 );
             }
 
-            // Booking is currently active
+            // =============================================
+            // BOOKING CURRENTLY ACTIVE
+            // =============================================
+
             else {
-                // If an old QR was marked Expired by the previous
-                // timezone-bugged logic, reactivate it while the
-                // actual booking window is still active.
-                if (booking.qr_status === "Expired") {
+
+                /*
+                 * If QR was marked Expired because of an
+                 * earlier timezone bug, restore it while
+                 * booking is actually active.
+                 */
+
+                if (
+                    booking.qr_status === "Expired" ||
+                    booking.qr_status === "Active"
+                ) {
+
                     await connection.query(
                         `
-                        UPDATE cricket_booking_qr
-                        SET qr_status = 'Active',
-                            expires_at = DATE_ADD(
-                                STR_TO_DATE(
-                                    CONCAT(
-                                        ?,
-                                        ' ',
-                                        ?
-                                    ),
-                                    '%Y-%m-%d %H:%i:%s'
-                                ),
-                                INTERVAL IF(
-                                    TIME(?) <= TIME(?),
-                                    1,
-                                    0
-                                ) DAY
-                            )
-                        WHERE id = ?
-                        `,
+                UPDATE cricket_booking_qr
+                SET qr_status = 'Active',
+                    expires_at = DATE_ADD(
+                        STR_TO_DATE(
+                            CONCAT(
+                                ?,
+                                ' ',
+                                ?
+                            ),
+                            '%Y-%m-%d %H:%i:%s'
+                        ),
+                        INTERVAL IF(
+                            TIME(?) <= TIME(?),
+                            1,
+                            0
+                        ) DAY
+                    )
+                WHERE id = ?
+                `,
                         [
                             bookingDate,
                             bookingEndTime,
@@ -405,7 +446,6 @@ const scanCricketQr = async (req, res) => {
                 }
             }
         }
-
         // =================================================
         // GET PREVIOUS VALID SCANS
         // =================================================

@@ -351,17 +351,28 @@ const scanCricketQr = async (req, res) => {
             let endDate = bookingDate;
 
             if (isOvernight) {
-                const nextDate = new Date(
-                    `${bookingDate}T00:00:00+05:30`
+                const [year, month, day] = bookingDate
+                    .split("-")
+                    .map(Number);
+
+                const nextDay = new Date(
+                    Date.UTC(year, month - 1, day)
                 );
 
-                nextDate.setUTCDate(
-                    nextDate.getUTCDate() + 1
+                nextDay.setUTCDate(
+                    nextDay.getUTCDate() + 1
                 );
 
-                endDate = nextDate
-                    .toISOString()
-                    .slice(0, 10);
+                const nextYear = nextDay.getUTCFullYear();
+                const nextMonth = String(
+                    nextDay.getUTCMonth() + 1
+                ).padStart(2, "0");
+                const nextDayNumber = String(
+                    nextDay.getUTCDate()
+                ).padStart(2, "0");
+
+                endDate =
+                    `${nextYear}-${nextMonth}-${nextDayNumber}`;
             }
 
             const endDateTime = makeIndiaDate(

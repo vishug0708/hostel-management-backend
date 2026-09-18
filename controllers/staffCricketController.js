@@ -176,6 +176,21 @@ const scanCricketQr = async (req, res) => {
         req.body.qr_token || ""
     ).trim();
 
+    const action = String(
+        req.body.action || ""
+    ).trim().toUpperCase();
+
+    if (
+        action !== "ENTRY" &&
+        action !== "EXIT"
+    ) {
+        return res.status(400).json({
+            success: false,
+            message: "Please select Allow Entry or Allow Exit.",
+            action: "DENIED"
+        });
+    }
+
     if (!qrToken) {
         return res.status(400).json({
             success: false,
@@ -478,37 +493,46 @@ const scanCricketQr = async (req, res) => {
         // ENTRY
         // =================================================
 
-        if (
-            scanStatus === "Valid" &&
-            validScanCount === 0
-        ) {
-            remarks =
-                "ENTRY ALLOWED. Student is allowed to enter the cricket box.";
-        }
+        if (scanStatus === "Valid") {
 
-        // =================================================
-        // EXIT
-        // =================================================
+            // =============================================
+            // MANUAL ENTRY
+            // =============================================
 
-        else if (
-            scanStatus === "Valid" &&
-            validScanCount === 1
-        ) {
-            remarks =
-                "EXIT ALLOWED. Student is allowed to exit the cricket box.";
-        }
+            if (action === "ENTRY") {
 
-        // =================================================
-        // THIRD OR MORE VALID SCAN
-        // =================================================
+                if (validScanCount === 0) {
+                    remarks =
+                        "ENTRY ALLOWED. Student is allowed to enter the cricket box.";
+                } else {
+                    scanStatus = "Rejected";
 
-        else if (
-            scanStatus === "Valid" &&
-            validScanCount >= 2
-        ) {
-            scanStatus = "Rejected";
-            remarks =
-                "Entry and exit have already been completed for this booking.";
+                    remarks =
+                        "Entry has already been completed for this booking.";
+                }
+            }
+
+            // =============================================
+            // MANUAL EXIT
+            // =============================================
+
+            else if (action === "EXIT") {
+
+                if (validScanCount === 0) {
+                    scanStatus = "Rejected";
+
+                    remarks =
+                        "EXIT DENIED. Student must enter the cricket box first.";
+                } else if (validScanCount === 1) {
+                    remarks =
+                        "EXIT ALLOWED. Student is allowed to exit the cricket box.";
+                } else {
+                    scanStatus = "Rejected";
+
+                    remarks =
+                        "Entry and exit have already been completed for this booking.";
+                }
+            }
         }
 
         // =================================================
@@ -605,11 +629,7 @@ const scanCricketQr = async (req, res) => {
             });
         }
 
-        // =================================================
-        // ENTRY RESPONSE
-        // =================================================
-
-        if (validScanCount === 0) {
+        if (action === "ENTRY") {
             return res.json({
                 success: true,
                 message:
@@ -620,11 +640,7 @@ const scanCricketQr = async (req, res) => {
             });
         }
 
-        // =================================================
-        // EXIT RESPONSE
-        // =================================================
-
-        if (validScanCount === 1) {
+        if (action === "EXIT") {
             return res.json({
                 success: true,
                 message:

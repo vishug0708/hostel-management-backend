@@ -492,21 +492,23 @@ const createBooking = async (req, res) => {
         // ADD BOOKING STUDENT AS FIRST PLAYER
         // -------------------------------------------------
 
+        const mainStudentId = String(student.id);
+
         await connection.query(
             `
-            INSERT INTO cricket_booking_players
-            (
-                booking_id,
-                student_name,
-                student_id,
-                mobile
-            )
-            VALUES (?, ?, ?, ?)
-            `,
+    INSERT INTO cricket_booking_players
+    (
+        booking_id,
+        student_name,
+        student_id,
+        mobile
+    )
+    VALUES (?, ?, ?, ?)
+    `,
             [
                 bookingId,
                 student.name,
-                String(student.id),
+                mainStudentId,
                 student.mobile || null
             ]
         );
@@ -515,47 +517,117 @@ const createBooking = async (req, res) => {
         // ADD OTHER PLAYERS
         // -------------------------------------------------
 
+        const addedPlayerIds = new Set();
+
+        addedPlayerIds.add(mainStudentId);
+
         for (const player of players) {
-            const playerName = String(player.student_name || "").trim();
+
+            const playerName = String(
+                player.student_name || ""
+            ).trim();
 
             if (!playerName) {
                 continue;
             }
 
-            const playerId = player.student_id
+            let playerId = player.student_id
                 ? String(player.student_id).trim()
-                : null;
+                : "";
 
-            const playerMobile = player.mobile
+            let playerMobile = player.mobile
                 ? String(player.mobile).trim()
-                : null;
+                : "";
 
-            const isSameStudent =
-                playerId &&
-                playerId === String(student.id);
+            // -------------------------------------------------
+            // STUDENT ID NOT PROVIDED
+            // -------------------------------------------------
 
-            if (isSameStudent) {
-                continue;
+            if (!playerId) {
+                await connection.rollback();
+
+                return res.status(400).json({
+                    success: false,
+                    message: `Please select a valid student for "${playerName}". Student ID is required.`
+                });
             }
+
+            // -------------------------------------------------
+            // CHECK STUDENT EXISTS
+            // -------------------------------------------------
+
+            const [studentRows] = await connection.query(
+                `
+        SELECT
+            id,
+            name,
+            mobile
+        FROM students
+        WHERE id = ?
+        LIMIT 1
+        `,
+                [playerId]
+            );
+
+            if (studentRows.length === 0) {
+                await connection.rollback();
+
+                return res.status(400).json({
+                    success: false,
+                    message: `Student "${playerName}" was not found.`
+                });
+            }
+
+            const selectedStudent = studentRows[0];
+
+            // -------------------------------------------------
+            // DUPLICATE STUDENT CHECK
+            // -------------------------------------------------
+
+            if (addedPlayerIds.has(String(selectedStudent.id))) {
+                await connection.rollback();
+
+                return res.status(400).json({
+                    success: false,
+                    message: `${selectedStudent.name} is already added to this booking.`
+                });
+            }
+
+            // -------------------------------------------------
+            // USE DATABASE STUDENT DETAILS
+            // -------------------------------------------------
+
+            playerId = String(selectedStudent.id);
+
+            playerMobile =
+                selectedStudent.mobile ||
+                playerMobile ||
+                null;
+
+            // -------------------------------------------------
+            // ADD PLAYER
+            // -------------------------------------------------
 
             await connection.query(
                 `
-                INSERT INTO cricket_booking_players
-                (
-                    booking_id,
-                    student_name,
-                    student_id,
-                    mobile
-                )
-                VALUES (?, ?, ?, ?)
-                `,
+        INSERT INTO cricket_booking_players
+        (
+            booking_id,
+            student_name,
+            student_id,
+            mobile
+        )
+        VALUES (?, ?, ?, ?)
+        `,
                 [
                     bookingId,
-                    playerName,
+                    selectedStudent.name,
                     playerId,
                     playerMobile
                 ]
             );
+
+            addedPlayerIds.add(playerId);
         }
 
         await connection.commit();

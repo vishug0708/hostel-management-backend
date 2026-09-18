@@ -182,15 +182,15 @@ const scanCricketQr = async (req, res) => {
 
     if (
         action !== "ENTRY" &&
-        action !== "EXIT"
+        action !== "EXIT" &&
+        action !== "CHECK"
     ) {
         return res.status(400).json({
             success: false,
-            message: "Please select Allow Entry or Allow Exit.",
+            message: "Invalid QR action.",
             action: "DENIED"
         });
     }
-
     if (!qrToken) {
         return res.status(400).json({
             success: false,
@@ -487,6 +487,47 @@ const scanCricketQr = async (req, res) => {
             );
 
             validScanCount = validScans.length;
+        }
+
+        // =====================================================
+        // CHECK QR ONLY
+        // QR scan hone par sirf booking information return karo.
+        // Entry / Exit ka koi log nahi banega.
+        // =====================================================
+
+        if (
+            scanStatus === "Valid" &&
+            action === "CHECK"
+        ) {
+            let nextAction = "ENTRY";
+
+            if (validScanCount >= 1) {
+                nextAction = "EXIT";
+            }
+
+            await connection.rollback();
+
+            return res.json({
+                success: true,
+                message:
+                    nextAction === "ENTRY"
+                        ? "Booking verified. Entry is available."
+                        : "Booking verified. Exit is available.",
+                scan_status: "Valid",
+                action: nextAction,
+                qr_token: booking.qr_token,
+                booking: {
+                    booking_id: booking.booking_id,
+                    student_name: booking.student_name,
+                    student_mobile: booking.student_mobile,
+                    ground_name: booking.ground_name,
+                    booking_date: booking.booking_date,
+                    start_time: booking.start_time,
+                    end_time: booking.end_time,
+                    payment_status: booking.payment_status,
+                    booking_status: booking.booking_status
+                }
+            });
         }
 
         // =================================================

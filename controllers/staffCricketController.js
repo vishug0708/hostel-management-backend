@@ -380,6 +380,9 @@ const scanCricketQr = async (req, res) => {
                 bookingEndTime
             );
 
+            // QR gets 5 minutes grace period after booking ends
+            endDateTime.setMinutes(endDateTime.getMinutes() + 5);
+
             /*
              * IMPORTANT:
              * Always compare actual India time.

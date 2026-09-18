@@ -1322,13 +1322,22 @@ const verifyPayment = async (req, res) => {
             [booking.id, studentId]
         );
 
+        // =====================================================
+        // CREATE / UPDATE BOOKING QR
+        // QR EXPIRY = BOOKING END TIME + 5 MINUTES
+        // =====================================================
+
         const [existingQr] = await connection.query(
             `
-    SELECT id, qr_token, qr_status, expires_at
-    FROM cricket_booking_qr
-    WHERE booking_id = ?
-    LIMIT 1
-    `,
+            SELECT
+            id,
+            qr_token,
+            qr_status,
+            expires_at
+            FROM cricket_booking_qr
+            WHERE booking_id = ?
+            LIMIT 1
+            `,
             [booking.id]
         );
 
@@ -1339,25 +1348,26 @@ const verifyPayment = async (req, res) => {
 
             await connection.query(
                 `
-    UPDATE cricket_booking_qr
-    SET qr_status = 'Active',
-        expires_at = DATE_ADD(
-            STR_TO_DATE(
-                CONCAT(
-                    DATE_FORMAT(?, '%Y-%m-%d'),
-                    ' ',
-                    TIME_FORMAT(?, '%H:%i:%s')
+        UPDATE cricket_booking_qr
+        SET
+            qr_status = 'Active',
+            expires_at = DATE_ADD(
+                STR_TO_DATE(
+                    CONCAT(
+                        DATE_FORMAT(?, '%Y-%m-%d'),
+                        ' ',
+                        TIME_FORMAT(?, '%H:%i:%s')
+                    ),
+                    '%Y-%m-%d %H:%i:%s'
                 ),
-                '%Y-%m-%d %H:%i:%s'
-            ),
-            INTERVAL IF(
-                TIME(?) <= TIME(?),
-                1,
-                0
-            ) DAY
-        )
-    WHERE booking_id = ?
-    `,
+                INTERVAL
+                    CASE
+                        WHEN TIME(?) <= TIME(?) THEN 1
+                        ELSE 0
+                    END DAY
+            ) + INTERVAL 5 MINUTE
+        WHERE booking_id = ?
+        `,
                 [
                     booking.booking_date,
                     booking.end_time,
@@ -1371,34 +1381,35 @@ const verifyPayment = async (req, res) => {
 
             await connection.query(
                 `
-    INSERT INTO cricket_booking_qr
-    (
-        booking_id,
-        qr_token,
-        qr_status,
-        expires_at
-    )
-    VALUES (
-        ?,
-        ?,
-        'Active',
-        DATE_ADD(
-            STR_TO_DATE(
-                CONCAT(
-                    DATE_FORMAT(?, '%Y-%m-%d'),
-                    ' ',
-                    TIME_FORMAT(?, '%H:%i:%s')
-                ),
-                '%Y-%m-%d %H:%i:%s'
-            ),
-            INTERVAL IF(
-                TIME(?) <= TIME(?),
-                1,
-                0
-            ) DAY
+        INSERT INTO cricket_booking_qr
+        (
+            booking_id,
+            qr_token,
+            qr_status,
+            expires_at
         )
-    )
-    `,
+        VALUES
+        (
+            ?,
+            ?,
+            'Active',
+            DATE_ADD(
+                STR_TO_DATE(
+                    CONCAT(
+                        DATE_FORMAT(?, '%Y-%m-%d'),
+                        ' ',
+                        TIME_FORMAT(?, '%H:%i:%s')
+                    ),
+                    '%Y-%m-%d %H:%i:%s'
+                ),
+                INTERVAL
+                    CASE
+                        WHEN TIME(?) <= TIME(?) THEN 1
+                        ELSE 0
+                    END DAY
+            ) + INTERVAL 5 MINUTE
+        )
+        `,
                 [
                     booking.id,
                     qrToken,

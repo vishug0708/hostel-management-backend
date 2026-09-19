@@ -1,8 +1,7 @@
 const db = require("../config/database");
-const crypto = require("crypto");
 
 // ======================================================
-// GET ALL GATE PASS REQUESTS
+// GET ALL GATE PASS REQUESTS FOR RECTOR
 // GET /api/rector/gatepass
 // ======================================================
 const getAllGatePasses = async (req, res) => {
@@ -16,7 +15,6 @@ const getAllGatePasses = async (req, res) => {
                 gp.out_date,
                 gp.return_date,
                 gp.out_time,
-                gp.return_time,
                 gp.exit_datetime,
                 gp.entry_datetime,
                 gp.rector,
@@ -24,11 +22,9 @@ const getAllGatePasses = async (req, res) => {
                 gp.verification_code,
                 gp.qr_code,
                 gp.otp_verified,
-                gp.otp_verified_at,
                 gp.security_exit,
                 gp.security_entry,
-                gp.security_exit_time,
-                gp.security_entry_time,
+
                 s.name AS student_name,
                 s.email AS student_email,
                 s.mobile AS student_mobile,
@@ -37,9 +33,12 @@ const getAllGatePasses = async (req, res) => {
                 s.course,
                 s.hostel,
                 s.photo
+
             FROM gate_pass gp
+
             INNER JOIN students s
                 ON gp.student_id = s.id
+
             ORDER BY gp.created_at DESC, gp.id DESC
         `);
 
@@ -47,6 +46,7 @@ const getAllGatePasses = async (req, res) => {
             success: true,
             gatePasses: rows
         });
+
     } catch (error) {
         console.error("Get Rector Gate Passes Error:", error);
 
@@ -57,6 +57,7 @@ const getAllGatePasses = async (req, res) => {
         });
     }
 };
+
 
 // ======================================================
 // GET PENDING GATE PASSES
@@ -73,12 +74,10 @@ const getPendingGatePasses = async (req, res) => {
                 gp.out_date,
                 gp.return_date,
                 gp.out_time,
-                gp.return_time,
                 gp.rector,
                 gp.created_at,
                 gp.otp_verified,
-                gp.otp_verified_at,
-                gp.qr_code,
+
                 s.name AS student_name,
                 s.email AS student_email,
                 s.mobile AS student_mobile,
@@ -87,10 +86,14 @@ const getPendingGatePasses = async (req, res) => {
                 s.course,
                 s.hostel,
                 s.photo
+
             FROM gate_pass gp
+
             INNER JOIN students s
                 ON gp.student_id = s.id
+
             WHERE gp.rector = 'Pending'
+
             ORDER BY gp.created_at ASC, gp.id ASC
         `);
 
@@ -98,6 +101,7 @@ const getPendingGatePasses = async (req, res) => {
             success: true,
             gatePasses: rows
         });
+
     } catch (error) {
         console.error("Get Pending Gate Passes Error:", error);
 
@@ -108,6 +112,7 @@ const getPendingGatePasses = async (req, res) => {
         });
     }
 };
+
 
 // ======================================================
 // GET SINGLE GATE PASS
@@ -128,6 +133,7 @@ const getGatePassById = async (req, res) => {
             `
             SELECT
                 gp.*,
+
                 s.name AS student_name,
                 s.email AS student_email,
                 s.mobile AS student_mobile,
@@ -136,10 +142,14 @@ const getGatePassById = async (req, res) => {
                 s.course,
                 s.hostel,
                 s.photo
+
             FROM gate_pass gp
+
             INNER JOIN students s
                 ON gp.student_id = s.id
+
             WHERE gp.id = ?
+
             LIMIT 1
             `,
             [id]
@@ -156,6 +166,7 @@ const getGatePassById = async (req, res) => {
             success: true,
             gatePass: rows[0]
         });
+
     } catch (error) {
         console.error("Get Gate Pass By ID Error:", error);
 
@@ -166,6 +177,7 @@ const getGatePassById = async (req, res) => {
         });
     }
 };
+
 
 // ======================================================
 // APPROVE GATE PASS
@@ -182,15 +194,13 @@ const approveGatePass = async (req, res) => {
             });
         }
 
+        // Check gate pass
         const [rows] = await db.query(
             `
             SELECT
                 id,
                 rector,
-                otp_verified,
-                qr_code,
-                security_exit,
-                security_entry
+                otp_verified
             FROM gate_pass
             WHERE id = ?
             LIMIT 1
@@ -207,6 +217,7 @@ const approveGatePass = async (req, res) => {
 
         const gatePass = rows[0];
 
+        // Parent OTP must be verified first
         if (gatePass.otp_verified !== "Yes") {
             return res.status(400).json({
                 success: false,
@@ -215,6 +226,7 @@ const approveGatePass = async (req, res) => {
             });
         }
 
+        // Already approved
         if (gatePass.rector === "Approved") {
             return res.status(400).json({
                 success: false,
@@ -222,6 +234,7 @@ const approveGatePass = async (req, res) => {
             });
         }
 
+        // Already rejected
         if (gatePass.rector === "Rejected") {
             return res.status(400).json({
                 success: false,
@@ -229,28 +242,21 @@ const approveGatePass = async (req, res) => {
             });
         }
 
-        // Generate the QR only after rector approval.
-        // The existing verification_code remains the stable gate-pass identifier.
-        const qrCode =
-            gatePass.qr_code || crypto.randomBytes(32).toString("hex");
-
+        // Approve
         await db.query(
             `
             UPDATE gate_pass
-            SET
-                rector = 'Approved',
-                qr_code = ?
+            SET rector = 'Approved'
             WHERE id = ?
             `,
-            [qrCode, id]
+            [id]
         );
 
         return res.status(200).json({
             success: true,
-            message:
-                "Gate pass approved successfully. QR code has been generated.",
-            qr_code: qrCode
+            message: "Gate pass approved successfully."
         });
+
     } catch (error) {
         console.error("Approve Gate Pass Error:", error);
 
@@ -261,6 +267,7 @@ const approveGatePass = async (req, res) => {
         });
     }
 };
+
 
 // ======================================================
 // REJECT GATE PASS
@@ -306,16 +313,15 @@ const rejectGatePass = async (req, res) => {
         if (rows[0].rector === "Approved") {
             return res.status(400).json({
                 success: false,
-                message: "Approved gate pass cannot be rejected."
+                message:
+                    "Approved gate pass cannot be rejected."
             });
         }
 
         await db.query(
             `
             UPDATE gate_pass
-            SET
-                rector = 'Rejected',
-                qr_code = NULL
+            SET rector = 'Rejected'
             WHERE id = ?
             `,
             [id]
@@ -325,6 +331,7 @@ const rejectGatePass = async (req, res) => {
             success: true,
             message: "Gate pass rejected successfully."
         });
+
     } catch (error) {
         console.error("Reject Gate Pass Error:", error);
 
@@ -336,6 +343,10 @@ const rejectGatePass = async (req, res) => {
     }
 };
 
+
+// ======================================================
+// EXPORT
+// ======================================================
 module.exports = {
     getAllGatePasses,
     getPendingGatePasses,

@@ -691,6 +691,7 @@ const scanCricketQr = async (req, res) => {
                     "ENTRY ALLOWED. Student may enter the cricket box.",
                 scan_status: "Valid",
                 action: "ENTRY",
+                qr_token: booking.qr_token,
                 booking: responseBooking
             });
         }
@@ -702,6 +703,7 @@ const scanCricketQr = async (req, res) => {
                     "EXIT ALLOWED. Student may exit the cricket box.",
                 scan_status: "Valid",
                 action: "EXIT",
+                qr_token: booking.qr_token,
                 booking: responseBooking
             });
         }

@@ -515,8 +515,34 @@ const scanCricketQr = async (req, res) => {
         ) {
             let nextAction = "ENTRY";
 
-            if (validScanCount >= 1) {
+            if (validScanCount === 1) {
                 nextAction = "EXIT";
+            } else if (validScanCount >= 2) {
+                nextAction = "COMPLETED";
+            }
+
+            if (validScanCount >= 2) {
+                await connection.rollback();
+
+                return res.json({
+                    success: true,
+                    message:
+                        "ENTRY and EXIT have already been completed for this booking.",
+                    scan_status: "Completed",
+                    action: "COMPLETED",
+                    qr_token: booking.qr_token,
+                    booking: {
+                        booking_id: booking.booking_id,
+                        student_name: booking.student_name,
+                        student_mobile: booking.student_mobile,
+                        ground_name: booking.ground_name,
+                        booking_date: booking.booking_date,
+                        start_time: booking.start_time,
+                        end_time: booking.end_time,
+                        payment_status: booking.payment_status,
+                        booking_status: booking.booking_status
+                    }
+                });
             }
 
             await connection.rollback();

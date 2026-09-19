@@ -143,7 +143,8 @@ const applyGatePass = async (req, res) => {
             destination,
             out_date,
             return_date,
-            out_time
+            out_time,
+            return_time
         } = req.body;
 
         // --------------------------------------------------
@@ -156,11 +157,35 @@ const applyGatePass = async (req, res) => {
             !destination ||
             !out_date ||
             !return_date ||
-            !out_time
+            !out_time ||
+            !return_time
         ) {
             return res.status(400).json({
                 success: false,
                 message: "All gate pass fields are required."
+            });
+        }
+
+        // --------------------------------------------------
+        // VALIDATE DATE/TIME RANGE
+        // --------------------------------------------------
+
+        const exitDateTime = new Date(
+            `${out_date}T${out_time}`
+        );
+        const returnDateTime = new Date(
+            `${return_date}T${return_time}`
+        );
+
+        if (
+            Number.isNaN(exitDateTime.getTime()) ||
+            Number.isNaN(returnDateTime.getTime()) ||
+            returnDateTime <= exitDateTime
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "Return date and time must be after exit date and time."
             });
         }
 
@@ -256,6 +281,7 @@ const applyGatePass = async (req, res) => {
                 out_date,
                 return_date,
                 out_time,
+                return_time,
                 rector,
                 created_at,
                 verification_code,
@@ -269,6 +295,7 @@ const applyGatePass = async (req, res) => {
             )
             VALUES
             (
+                ?,
                 ?,
                 ?,
                 ?,
@@ -294,6 +321,7 @@ const applyGatePass = async (req, res) => {
                 out_date,
                 return_date,
                 out_time,
+                return_time,
                 crypto.randomBytes(32).toString("hex"),
                 otp,
                 otpExpiry
@@ -394,6 +422,7 @@ const getMyGatePasses = async (req, res) => {
                 gp.out_date,
                 gp.return_date,
                 gp.out_time,
+                gp.return_time,
                 gp.exit_datetime,
                 gp.entry_datetime,
                 gp.rector,
@@ -475,6 +504,7 @@ const getGatePassById = async (req, res) => {
                 gp.out_date,
                 gp.return_date,
                 gp.out_time,
+                gp.return_time,
                 gp.exit_datetime,
                 gp.entry_datetime,
                 gp.rector,

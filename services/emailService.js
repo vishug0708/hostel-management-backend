@@ -1,12 +1,16 @@
 const nodemailer = require("nodemailer");
 
+// ======================================================
+// BREVO SMTP CONFIGURATION
+// ======================================================
+
 const smtpHost =
     process.env.BREVO_SMTP_HOST ||
     "smtp-relay.brevo.com";
 
 const smtpPort = Number(
     process.env.BREVO_SMTP_PORT ||
-    587
+    2525
 );
 
 const smtpUser =
@@ -26,15 +30,26 @@ const fromName =
     process.env.BREVO_FROM_NAME ||
     "Hostel Management System";
 
+// ======================================================
+// NODEMAILER TRANSPORTER
+// ======================================================
+
 const transporter = nodemailer.createTransport({
     host: smtpHost,
     port: smtpPort,
-    secure: smtpPort === 465,
+    secure: false,
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout: 30000,
     auth: {
         user: smtpUser,
         pass: smtpPass
     }
 });
+
+// ======================================================
+// SEND EMAIL
+// ======================================================
 
 const sendEmail = async ({
     to,

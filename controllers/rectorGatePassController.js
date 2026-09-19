@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const db = require("../config/database");
 
 // ======================================================
@@ -200,7 +201,8 @@ const approveGatePass = async (req, res) => {
             SELECT
                 id,
                 rector,
-                otp_verified
+                otp_verified,
+                qr_code
             FROM gate_pass
             WHERE id = ?
             LIMIT 1
@@ -242,19 +244,26 @@ const approveGatePass = async (req, res) => {
             });
         }
 
-        // Approve
+        // Generate the QR token only after parent verification and rector approval.
+        const qrCode =
+            gatePass.qr_code ||
+            crypto.randomBytes(32).toString("hex");
+
         await db.query(
             `
             UPDATE gate_pass
-            SET rector = 'Approved'
+            SET
+                rector = 'Approved',
+                qr_code = ?
             WHERE id = ?
             `,
-            [id]
+            [qrCode, id]
         );
 
         return res.status(200).json({
             success: true,
-            message: "Gate pass approved successfully."
+            message: "Gate pass approved successfully and QR code generated.",
+            qr_code: qrCode
         });
 
     } catch (error) {

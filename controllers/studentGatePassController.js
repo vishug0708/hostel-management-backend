@@ -1,50 +1,20 @@
 const db = require("../config/database");
-const nodemailer = require("nodemailer");
 const crypto = require("crypto");
-
-// ======================================================
-// EMAIL CONFIGURATION
-// ======================================================
-
-const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: String(process.env.EMAIL_PASS || "").replace(/\s/g, "")
-    }
-});
-
-
-// ======================================================
-// VERIFY GMAIL SMTP CONNECTION
-// ======================================================
-
-
-transporter.verify((error, success) => {
-    if (error) {
-        console.error(
-            "❌ Gmail SMTP Connection Error:",
-            error.message
-        );
-    } else {
-        console.log(
-            "✅ Gmail SMTP Server Ready"
-        );
-    }
-});
+const { sendEmail } = require("../services/emailService");
 
 // ======================================================
 // GENERATE 6 DIGIT OTP
 // ======================================================
 
 const generateOTP = () => {
-    return crypto.randomInt(100000, 1000000).toString();
+    return crypto.randomInt(
+        100000,
+        1000000
+    ).toString();
 };
 
 // ======================================================
-// SEND PARENT OTP EMAIL
+// SEND PARENT OTP EMAIL USING BREVO SMTP + NODEMAILER
 // ======================================================
 
 const sendParentOTP = async (
@@ -53,14 +23,10 @@ const sendParentOTP = async (
     otp,
     gatePassId
 ) => {
-    await transporter.sendMail({
-        from: {
-            name: "Virtuous Hostel",
-            address: process.env.EMAIL_USER
-        },
+    const result = await sendEmail({
         to: parentEmail,
         subject: "Gate Pass Verification OTP",
-
+        text: `Virtuous Hostel Gate Pass Verification OTP for ${studentName}: ${otp}. Gate Pass ID: GP-${gatePassId}. OTP is valid for 10 minutes.`,
         html: `
         <div style="
             max-width:600px;
@@ -69,49 +35,40 @@ const sendParentOTP = async (
             background:#f5f8fa;
             padding:30px;
         ">
-
             <div style="
                 background:white;
                 border-radius:15px;
                 padding:30px;
                 border:1px solid #e1e8ee;
             ">
-
                 <h2 style="
                     color:#117d75;
                     margin-top:0;
                 ">
                     Virtuous Hostel
                 </h2>
-
                 <h3>
                     Gate Pass Verification
                 </h3>
-
                 <p>
                     Dear Parent,
                 </p>
-
                 <p>
                     Your ward has submitted a gate pass request.
                     Please verify the request using the OTP below.
                 </p>
-
                 <p>
                     <strong>Student:</strong>
                     ${studentName}
                 </p>
-
                 <p>
                     <strong>Gate Pass ID:</strong>
                     GP-${gatePassId}
                 </p>
-
                 <div style="
                     text-align:center;
                     margin:30px 0;
                 ">
-
                     <div style="
                         display:inline-block;
                         background:#117d75;
@@ -124,21 +81,16 @@ const sendParentOTP = async (
                     ">
                         ${otp}
                     </div>
-
                 </div>
-
                 <p>
                     This OTP is valid for
                     <strong>10 minutes</strong>.
                 </p>
-
                 <p style="color:#777;">
                     If you did not expect this request,
                     please contact the hostel rector.
                 </p>
-
                 <hr>
-
                 <p style="
                     font-size:12px;
                     color:#888;
@@ -146,12 +98,19 @@ const sendParentOTP = async (
                     Virtuous Hostel<br>
                     Hostel Management System
                 </p>
-
             </div>
-
         </div>
         `
     });
+
+    if (!result.success) {
+        throw new Error(
+            result.message ||
+            "Brevo could not send the OTP email."
+        );
+    }
+
+    return result;
 };
 
 // ======================================================

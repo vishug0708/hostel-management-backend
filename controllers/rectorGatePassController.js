@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const db = require("../config/db");
+const db = require("../config/database");
 
 // ======================================================
 // GET ALL GATE PASS REQUESTS FOR RECTOR

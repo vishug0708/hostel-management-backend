@@ -1,4 +1,4 @@
-const db = require("../config/db");
+const db = require("../config/database");
 const crypto = require("crypto");
 const { sendEmail } = require("../services/emailService");
 const { createGatePassToken } = require("../utils/gatePassToken");

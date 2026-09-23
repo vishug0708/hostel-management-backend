@@ -205,6 +205,7 @@ const approveGatePass = async (req, res) => {
                 id,
                 rector,
                 otp_verified,
+                parent_decision,
                 qr_code
             FROM gate_pass
             WHERE id = ?

@@ -243,6 +243,7 @@ const applyGatePass = async (req, res) => {
                 ?,
                 ?,
                 'No',
+                'Pending',
                 NULL,
                 0,
                 'No',

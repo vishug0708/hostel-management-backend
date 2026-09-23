@@ -59,6 +59,7 @@ const studentAuthRoutes = require("./routes/studentAuthRoutes");
 const studentRoutes = require("./routes/studentRoutes");
 const studentCricketRoutes = require("./routes/studentCricketRoutes");
 const studentGatePassRoutes = require("./routes/studentGatePassRoutes");
+const parentGatePassRoutes = require("./routes/parentGatePassRoutes");
 
 
 // =====================================================
@@ -288,6 +289,11 @@ app.use(
 app.use(
     "/api/student/gatepass",
     studentGatePassRoutes
+);
+
+app.use(
+    "/api/parent/gatepass",
+    parentGatePassRoutes
 );
 
 app.use(

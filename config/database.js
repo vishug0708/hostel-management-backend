@@ -14,18 +14,38 @@ const db = mysql.createPool({
     queueLimit: 0
 }).promise();
 
-console.log("🔗 MySQL Host:", "hostel-management-vishug0708.c.aivencloud.com");
-console.log("🔗 MySQL Port:", 27913);
-console.log("🔗 MySQL Database:", "defaultdb");
-console.log("🔐 MySQL SSL: ENABLED");
+console.log(
+    "🔗 MySQL Host:",
+    "hostel-management-vishug0708.c.aivencloud.com"
+);
+
+console.log(
+    "🔗 MySQL Port:",
+    27913
+);
+
+console.log(
+    "🔗 MySQL Database:",
+    "defaultdb"
+);
+
+console.log(
+    "🔐 MySQL SSL: ENABLED"
+);
 
 db.getConnection()
     .then((connection) => {
-        console.log("✅ MySQL Database Connected");
+        console.log(
+            "✅ MySQL Database Connected"
+        );
+
         connection.release();
     })
     .catch((error) => {
-        console.error("❌ MySQL Connection Error:", error.message);
+        console.error(
+            "❌ MySQL Connection Error:",
+            error.message
+        );
     });
 
 module.exports = db;

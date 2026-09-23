@@ -1,103 +1,68 @@
-const db = require("../config/database");
+const db = require("../config/db");
 const crypto = require("crypto");
 const { sendEmail } = require("../services/emailService");
-
-// ======================================================
-// GENERATE 6 DIGIT OTP
-// ======================================================
+const { createGatePassToken } = require("../utils/gatePassToken");
 
 const generateOTP = () => {
-    return crypto.randomInt(
-        100000,
-        1000000
-    ).toString();
+    return crypto.randomInt(100000, 1000000).toString();
 };
 
 // ======================================================
-// SEND PARENT OTP EMAIL USING BREVO SMTP + NODEMAILER
+// SEND PARENT GATE PASS EMAIL
 // ======================================================
 
-const sendParentOTP = async (
+const sendParentGatePassEmail = async (
     parentEmail,
     studentName,
     otp,
-    gatePassId
+    gatePassId,
+    verificationCode
 ) => {
+    const frontendUrl = String(
+        process.env.FRONTEND_URL ||
+        "http://localhost:5173"
+    ).replace(/\/$/, "");
+
+    const reviewToken = createGatePassToken({
+        gatePassId,
+        verificationCode,
+        verified: false,
+        expiresInSeconds: 24 * 60 * 60
+    });
+
+    const reviewUrl = `${frontendUrl}/parent/gatepass/verify-otp/${gatePassId}?token=${encodeURIComponent(reviewToken)}`;
+
     const result = await sendEmail({
         to: parentEmail,
-        subject: "Gate Pass Verification OTP",
-        text: `Virtuous Hostel Gate Pass Verification OTP for ${studentName}: ${otp}. Gate Pass ID: GP-${gatePassId}. OTP is valid for 10 minutes.`,
+        subject: "Gate Pass Verification - Virtuous Hostel",
+        text: `Dear Parent,\n\nYour ward ${studentName} has submitted a gate pass request.\n\nGate Pass ID: GP-${gatePassId}\nOTP: ${otp}\nOTP validity: 10 minutes\n\nReview Gate Pass: ${reviewUrl}\n\nPlease open the review link and enter the OTP to view the gate pass details and approve or reject the request.\n\nVirtuous Hostel\nHostel Management System`,
         html: `
-        <div style="
-            max-width:600px;
-            margin:auto;
-            font-family:Arial,sans-serif;
-            background:#f5f8fa;
-            padding:30px;
-        ">
-            <div style="
-                background:white;
-                border-radius:15px;
-                padding:30px;
-                border:1px solid #e1e8ee;
-            ">
-                <h2 style="
-                    color:#117d75;
-                    margin-top:0;
-                ">
-                    Virtuous Hostel
-                </h2>
-                <h3>
-                    Gate Pass Verification
-                </h3>
-                <p>
-                    Dear Parent,
+        <div style="max-width:620px;margin:auto;font-family:Arial,Helvetica,sans-serif;background:#f4f8fa;padding:28px;">
+            <div style="background:#ffffff;border:1px solid #dce7ec;border-radius:18px;padding:32px;">
+                <h2 style="margin:0 0 8px;color:#117d75;">Virtuous Hostel</h2>
+                <h3 style="margin:0 0 24px;color:#153654;">Gate Pass Verification</h3>
+                <p style="color:#334e68;">Dear Parent,</p>
+                <p style="color:#334e68;line-height:1.7;">
+                    Your ward <strong>${studentName}</strong> has submitted a gate pass request.
+                    Please review the request using the secure link below.
                 </p>
-                <p>
-                    Your ward has submitted a gate pass request.
-                    Please verify the request using the OTP below.
-                </p>
-                <p>
-                    <strong>Student:</strong>
-                    ${studentName}
-                </p>
-                <p>
-                    <strong>Gate Pass ID:</strong>
-                    GP-${gatePassId}
-                </p>
-                <div style="
-                    text-align:center;
-                    margin:30px 0;
-                ">
-                    <div style="
-                        display:inline-block;
-                        background:#117d75;
-                        color:white;
-                        padding:15px 35px;
-                        border-radius:10px;
-                        font-size:30px;
-                        font-weight:bold;
-                        letter-spacing:8px;
-                    ">
-                        ${otp}
-                    </div>
+                <p style="color:#334e68;"><strong>Gate Pass ID:</strong> GP-${gatePassId}</p>
+                <div style="margin:24px 0;padding:20px;text-align:center;background:#f7fafc;border:1px solid #e1e8ed;border-radius:14px;">
+                    <div style="font-size:12px;color:#718096;margin-bottom:8px;">ONE-TIME PASSWORD</div>
+                    <div style="font-size:30px;font-weight:800;letter-spacing:7px;color:#117d75;">${otp}</div>
+                    <div style="margin-top:8px;color:#718096;font-size:13px;">Valid for 10 minutes</div>
                 </div>
-                <p>
-                    This OTP is valid for
-                    <strong>10 minutes</strong>.
+                <div style="text-align:center;margin:28px 0;">
+                    <a href="${reviewUrl}" style="display:inline-block;padding:14px 24px;border-radius:10px;background:#117d75;color:#ffffff;text-decoration:none;font-weight:700;">
+                        Review Gate Pass
+                    </a>
+                </div>
+                <p style="color:#718096;line-height:1.7;">
+                    After opening the link, enter the OTP to view the gate pass details.
+                    You can then approve or reject the request. The student does not need to verify this OTP.
                 </p>
-                <p style="color:#777;">
-                    If you did not expect this request,
-                    please contact the hostel rector.
-                </p>
-                <hr>
-                <p style="
-                    font-size:12px;
-                    color:#888;
-                ">
-                    Virtuous Hostel<br>
-                    Hostel Management System
-                </p>
+                <hr style="border:0;border-top:1px solid #e2e8f0;margin:26px 0;">
+                <p style="margin:0;color:#8a9aab;font-size:12px;">Virtuous Hostel<br>Hostel Management System</p>
             </div>
         </div>
         `
@@ -106,11 +71,24 @@ const sendParentOTP = async (
     if (!result.success) {
         throw new Error(
             result.message ||
-            "Brevo could not send the OTP email."
+            "Brevo could not send the parent gate pass email."
         );
     }
 
     return result;
+};
+
+const getGatePassVerificationCode = async (gatePassId) => {
+    const [rows] = await db.query(
+        `SELECT verification_code FROM gate_pass WHERE id = ? LIMIT 1`,
+        [gatePassId]
+    );
+
+    if (!rows.length || !rows[0].verification_code) {
+        throw new Error("Gate pass verification code could not be created.");
+    }
+
+    return rows[0].verification_code;
 };
 
 // ======================================================
@@ -245,6 +223,7 @@ const applyGatePass = async (req, res) => {
                 parent_otp,
                 otp_expiry,
                 otp_verified,
+                parent_decision,
                 otp_verified_at,
                 otp_attempts,
                 security_exit,
@@ -284,17 +263,21 @@ const applyGatePass = async (req, res) => {
         );
 
         const gatePassId = result.insertId;
+        const verificationCode = await getGatePassVerificationCode(
+            gatePassId
+        );
 
         // --------------------------------------------------
-        // SEND OTP TO PARENT
+        // SEND PARENT GATE PASS EMAIL
         // --------------------------------------------------
 
         try {
-            await sendParentOTP(
+            await sendParentGatePassEmail(
                 student.parent_email,
                 student.name,
                 otp,
-                gatePassId
+                gatePassId,
+                verificationCode
             );
         } catch (emailError) {
 
@@ -326,9 +309,10 @@ const applyGatePass = async (req, res) => {
         return res.status(201).json({
             success: true,
             message:
-                "Gate pass submitted successfully. OTP has been sent to your parent's email.",
+                "Gate pass submitted successfully. A review link and OTP have been sent to your parent's email.",
             gate_pass_id: gatePassId,
-            otp_required: true
+            otp_required: true,
+            parent_review_required: true
         });
 
     } catch (error) {
@@ -386,6 +370,7 @@ const getMyGatePasses = async (req, res) => {
                 gp.parent_otp,
                 gp.otp_expiry,
                 gp.otp_verified,
+                gp.parent_decision,
                 gp.otp_verified_at,
                 gp.otp_attempts,
                 gp.security_exit,
@@ -465,6 +450,7 @@ const getGatePassById = async (req, res) => {
                 gp.verification_code,
                 gp.qr_code,
                 gp.otp_verified,
+                gp.parent_decision,
                 gp.otp_verified_at,
                 gp.security_exit,
                 gp.security_entry,
@@ -523,289 +509,6 @@ const getGatePassById = async (req, res) => {
 };
 
 // ======================================================
-// VERIFY PARENT OTP
-// POST /api/student/gatepass/verify-otp/:gatePassId
-// ======================================================
-
-const verifyParentOTP = async (req, res) => {
-    try {
-
-        const { gatePassId } = req.params;
-        const { otp } = req.body;
-
-        if (!gatePassId) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "Gate pass ID is required."
-            });
-        }
-
-        if (!otp) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "OTP is required."
-            });
-        }
-
-        const cleanOTP = String(otp).trim();
-
-        if (!/^\d{6}$/.test(cleanOTP)) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "Please enter a valid 6-digit OTP."
-            });
-        }
-
-        const [rows] = await db.query(
-            `
-            SELECT
-                id,
-                parent_otp,
-                otp_expiry,
-                otp_verified,
-                otp_attempts
-            FROM gate_pass
-            WHERE id = ?
-            LIMIT 1
-            `,
-            [gatePassId]
-        );
-
-        if (rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message:
-                    "Gate pass not found."
-            });
-        }
-
-        const gatePass = rows[0];
-
-        // Already verified
-        if (gatePass.otp_verified === "Yes") {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "OTP has already been verified."
-            });
-        }
-
-        // OTP missing
-        if (!gatePass.parent_otp) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "OTP not found. Please resend OTP."
-            });
-        }
-
-        // Expired
-        if (
-            !gatePass.otp_expiry ||
-            new Date() > new Date(gatePass.otp_expiry)
-        ) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "OTP has expired. Please resend OTP."
-            });
-        }
-
-        // Maximum attempts
-        if (
-            Number(gatePass.otp_attempts || 0) >= 5
-        ) {
-            return res.status(429).json({
-                success: false,
-                message:
-                    "Maximum OTP attempts reached. Please resend OTP."
-            });
-        }
-
-        // Wrong OTP
-        if (
-            cleanOTP !==
-            String(gatePass.parent_otp)
-        ) {
-
-            await db.query(
-                `
-                UPDATE gate_pass
-                SET otp_attempts =
-                    COALESCE(otp_attempts, 0) + 1
-                WHERE id = ?
-                `,
-                [gatePassId]
-            );
-
-            return res.status(400).json({
-                success: false,
-                message:
-                    "Incorrect OTP."
-            });
-        }
-
-        // OTP verified
-        await db.query(
-            `
-            UPDATE gate_pass
-            SET
-                otp_verified = 'Yes',
-                otp_verified_at = NOW(),
-                parent_otp = NULL,
-                otp_expiry = NULL,
-                otp_attempts = 0
-            WHERE id = ?
-            `,
-            [gatePassId]
-        );
-
-        return res.status(200).json({
-            success: true,
-            message:
-                "OTP verified successfully. Gate pass request has been sent for rector approval."
-        });
-
-    } catch (error) {
-
-        console.error(
-            "Verify Parent OTP Error:",
-            error
-        );
-
-        return res.status(500).json({
-            success: false,
-            message:
-                "Failed to verify OTP.",
-            error: error.message
-        });
-    }
-};
-
-// ======================================================
-// RESEND PARENT OTP
-// POST /api/student/gatepass/resend-otp/:gatePassId
-// ======================================================
-
-const resendParentOTP = async (req, res) => {
-    try {
-
-        const { gatePassId } = req.params;
-
-        if (!gatePassId) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "Gate pass ID is required."
-            });
-        }
-
-        const [rows] = await db.query(
-            `
-            SELECT
-                gp.id,
-                gp.otp_verified,
-                s.name AS student_name,
-                s.parent_email
-
-            FROM gate_pass gp
-
-            INNER JOIN students s
-                ON gp.student_id = s.id
-
-            WHERE gp.id = ?
-
-            LIMIT 1
-            `,
-            [gatePassId]
-        );
-
-        if (rows.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message:
-                    "Gate pass not found."
-            });
-        }
-
-        const gatePass = rows[0];
-
-        if (
-            gatePass.otp_verified === "Yes"
-        ) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "OTP has already been verified."
-            });
-        }
-
-        if (!gatePass.parent_email) {
-            return res.status(400).json({
-                success: false,
-                message:
-                    "Parent email is not registered."
-            });
-        }
-
-        // Generate new OTP
-        const otp = generateOTP();
-
-        const expiry = new Date(
-            Date.now() + 10 * 60 * 1000
-        );
-
-        await db.query(
-            `
-            UPDATE gate_pass
-            SET
-                parent_otp = ?,
-                otp_expiry = ?,
-                otp_verified = 'No',
-                otp_verified_at = NULL,
-                otp_attempts = 0
-            WHERE id = ?
-            `,
-            [
-                otp,
-                expiry,
-                gatePassId
-            ]
-        );
-
-        await sendParentOTP(
-            gatePass.parent_email,
-            gatePass.student_name,
-            otp,
-            gatePassId
-        );
-
-        return res.status(200).json({
-            success: true,
-            message:
-                "A new OTP has been sent to the parent's email."
-        });
-
-    } catch (error) {
-
-        console.error(
-            "Resend Parent OTP Error:",
-            error
-        );
-
-        return res.status(500).json({
-            success: false,
-            message:
-                "Failed to resend OTP.",
-            error: error.message
-        });
-    }
-};
-
-// ======================================================
 // EXPORTS
 // ======================================================
 
@@ -813,8 +516,5 @@ module.exports = {
     applyGatePass,
     getMyGatePasses,
     getGatePassById,
-    verifyParentOTP,
-    resendParentOTP,
-    sendParentOTP,
-    generateOTP
+    sendParentGatePassEmail
 };

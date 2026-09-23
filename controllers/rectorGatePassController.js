@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const db = require("../config/database");
+const db = require("../config/db");
 
 // ======================================================
 // GET ALL GATE PASS REQUESTS FOR RECTOR
@@ -23,6 +23,7 @@ const getAllGatePasses = async (req, res) => {
                 gp.verification_code,
                 gp.qr_code,
                 gp.otp_verified,
+                gp.parent_decision,
                 gp.security_exit,
                 gp.security_entry,
 
@@ -78,6 +79,7 @@ const getPendingGatePasses = async (req, res) => {
                 gp.rector,
                 gp.created_at,
                 gp.otp_verified,
+                gp.parent_decision,
 
                 s.name AS student_name,
                 s.email AS student_email,
@@ -94,6 +96,7 @@ const getPendingGatePasses = async (req, res) => {
                 ON gp.student_id = s.id
 
             WHERE gp.rector = 'Pending'
+            AND gp.parent_decision = 'Approved'
 
             ORDER BY gp.created_at ASC, gp.id ASC
         `);
@@ -219,12 +222,12 @@ const approveGatePass = async (req, res) => {
 
         const gatePass = rows[0];
 
-        // Parent OTP must be verified first
-        if (gatePass.otp_verified !== "Yes") {
+        // Parent must explicitly approve the gate pass first
+        if (gatePass.parent_decision !== "Approved") {
             return res.status(400).json({
                 success: false,
                 message:
-                    "Parent OTP is not verified. Rector cannot approve this gate pass yet."
+                    "Parent approval is required before the rector can approve this gate pass."
             });
         }
 

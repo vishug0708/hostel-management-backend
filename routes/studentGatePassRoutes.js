@@ -3,9 +3,7 @@ const express = require("express");
 const {
     applyGatePass,
     getMyGatePasses,
-    getGatePassById,
-    verifyParentOTP,
-    resendParentOTP
+    getGatePassById
 } = require("../controllers/studentGatePassController");
 
 const router = express.Router();
@@ -38,26 +36,6 @@ router.get(
 router.get(
     "/:student_id/:gate_pass_id",
     getGatePassById
-);
-
-// ======================================================
-// VERIFY PARENT OTP
-// POST /api/student/gatepass/verify-otp/:gatePassId
-// ======================================================
-
-router.post(
-    "/verify-otp/:gatePassId",
-    verifyParentOTP
-);
-
-// ======================================================
-// RESEND PARENT OTP
-// POST /api/student/gatepass/resend-otp/:gatePassId
-// ======================================================
-
-router.post(
-    "/resend-otp/:gatePassId",
-    resendParentOTP
 );
 
 module.exports = router;

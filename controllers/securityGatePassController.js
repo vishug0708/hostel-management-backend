@@ -54,6 +54,7 @@ const getReturnEndDateTime = (returnDate) => {
 // ======================================================
 
 const getGatePassForScan = async (qrValue) => {
+    // Keep QR verification independent from optional room data.
     const [rows] = await db.query(
         `
         SELECT
@@ -74,7 +75,6 @@ const getGatePassForScan = async (qrValue) => {
             gp.security_exit,
             gp.security_entry,
             gp.created_at,
-
             s.name,
             s.email,
             s.mobile,
@@ -82,33 +82,48 @@ const getGatePassForScan = async (qrValue) => {
             s.college,
             s.course,
             s.hostel,
-            s.photo,
-
-            r.room_no,
-            r.block
-
+            s.photo
         FROM gate_pass gp
-
-        INNER JOIN students s
-            ON gp.student_id = s.id
-
-        LEFT JOIN room_allocation ra
-            ON ra.student_id = s.id
-            AND ra.status = 'Allocated'
-
-        LEFT JOIN rooms r
-            ON ra.room_id = r.id
-
+        INNER JOIN students s ON gp.student_id = s.id
         WHERE gp.verification_code = ?
            OR gp.qr_code = ?
-
         ORDER BY gp.id DESC
         LIMIT 1
         `,
         [qrValue, qrValue]
     );
 
-    return rows.length > 0 ? rows[0] : null;
+    if (rows.length === 0) {
+        return null;
+    }
+
+    const gatePass = rows[0];
+    gatePass.room_no = null;
+    gatePass.block = null;
+
+    try {
+        const [roomRows] = await db.query(
+            `
+            SELECT r.room_no, r.block
+            FROM room_allocation ra
+            INNER JOIN rooms r ON ra.room_id = r.id
+            WHERE ra.student_id = ?
+              AND ra.status = 'Allocated'
+            ORDER BY ra.id DESC
+            LIMIT 1
+            `,
+            [gatePass.student_id]
+        );
+
+        if (roomRows.length > 0) {
+            gatePass.room_no = roomRows[0].room_no;
+            gatePass.block = roomRows[0].block;
+        }
+    } catch (roomError) {
+        console.warn('Gate pass room lookup skipped:', roomError.message);
+    }
+
+    return gatePass;
 };
 
 // ======================================================
@@ -208,6 +223,30 @@ const scanGatePass = async (req, res) => {
 
         const indiaNow = getIndiaNowParts();
         const currentDateTime = `${indiaNow.date} ${indiaNow.time}`;
+
+        // Exit is allowed only on the selected exit date. The selected
+        // exit TIME is informational; security may scan before or after it.
+        if (gatePass.security_exit !== "Yes") {
+            const exitDate = String(gatePass.out_date || "").slice(0, 10);
+
+            if (exitDate && indiaNow.date < exitDate) {
+                return res.status(403).json({
+                    success: false,
+                    action: "EXIT_NOT_STARTED",
+                    message: `Gate Pass exit is available on ${exitDate}.`,
+                    gatePass: buildGatePassResponse(gatePass, "EXIT_NOT_STARTED")
+                });
+            }
+
+            if (exitDate && indiaNow.date > exitDate) {
+                return res.status(403).json({
+                    success: false,
+                    action: "DENIED",
+                    message: "The selected exit date has passed. This gate pass cannot be used for exit.",
+                    gatePass: buildGatePassResponse(gatePass, "DENIED")
+                });
+            }
+        }
 
         // --------------------------------------------------
         // GATE PASS EXPIRY
@@ -382,7 +421,18 @@ const recordExit = async (req, res) => {
 
         const indiaNow = getIndiaNowParts();
         const currentDateTime = `${indiaNow.date} ${indiaNow.time}`;
+        const exitDate = String(gatePass.out_date || "").slice(0, 10);
 
+        if (exitDate && indiaNow.date !== exitDate) {
+            return res.status(403).json({
+                success: false,
+                message: indiaNow.date < exitDate
+                    ? `Gate Pass exit is available on ${exitDate}.`
+                    : "The selected exit date has passed. This gate pass cannot be used for exit."
+            });
+        }
+
+        // Scheduled exit TIME is intentionally not checked.
         const now = currentDateTime;
 
         const [result] = await db.query(
@@ -487,6 +537,15 @@ const recordEntry = async (req, res) => {
         }
 
         const indiaNow = getIndiaNowParts();
+        const returnDate = String(gatePass.return_date || "").slice(0, 10);
+
+        if (returnDate && indiaNow.date > returnDate) {
+            return res.status(403).json({
+                success: false,
+                message: "The gate pass return date has passed. Entry cannot be recorded."
+            });
+        }
+
         const now = `${indiaNow.date} ${indiaNow.time}`;
 
         const [result] = await db.query(

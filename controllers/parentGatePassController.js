@@ -24,6 +24,7 @@ const getGatePassForParent = async (gatePassId) => {
             gp.out_date,
             gp.return_date,
             gp.out_time,
+            gp.return_time,
             gp.rector,
             gp.created_at,
             gp.verification_code,

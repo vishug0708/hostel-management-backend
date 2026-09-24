@@ -64,6 +64,7 @@ const getGatePassForScan = async (qrValue) => {
             gp.out_date,
             gp.return_date,
             gp.out_time,
+            gp.return_time,
             gp.exit_datetime,
             gp.entry_datetime,
             gp.rector,
@@ -135,6 +136,7 @@ const buildGatePassResponse = (gatePass, action = null) => {
         out_date: gatePass.out_date,
         return_date: gatePass.return_date,
         out_time: gatePass.out_time,
+        return_time: gatePass.return_time,
 
         exit_datetime: gatePass.exit_datetime,
         entry_datetime: gatePass.entry_datetime,
@@ -261,23 +263,17 @@ const scanGatePass = async (req, res) => {
         // --------------------------------------------------
 
         if (gatePass.security_exit !== "Yes") {
-            const scheduledExitDateTime = getGatePassDateTime(
-                gatePass.out_date,
-                gatePass.out_time
-            );
+            const exitDate = String(gatePass.out_date || "").slice(0, 10);
 
-            if (
-                scheduledExitDateTime &&
-                currentDateTime < scheduledExitDateTime
-            ) {
+            if (exitDate && indiaNow.date !== exitDate) {
                 return res.status(403).json({
                     success: false,
-                    action: "EXIT_NOT_STARTED",
+                    action: "EXIT_DATE_MISMATCH",
                     message:
-                        `Gate Pass exit time has not started yet. Scheduled exit: ${scheduledExitDateTime}`,
+                        `Exit is allowed only on ${exitDate}. Current date: ${indiaNow.date}.`,
                     gatePass: buildGatePassResponse(
                         gatePass,
-                        "EXIT_NOT_STARTED"
+                        "EXIT_DATE_MISMATCH"
                     )
                 });
             }
@@ -402,23 +398,17 @@ const recordExit = async (req, res) => {
         const indiaNow = getIndiaNowParts();
         const currentDateTime = `${indiaNow.date} ${indiaNow.time}`;
 
-        const scheduledExitDateTime = getGatePassDateTime(
-            gatePass.out_date,
-            gatePass.out_time
-        );
+        const exitDate = String(gatePass.out_date || "").slice(0, 10);
 
-        if (
-            scheduledExitDateTime &&
-            currentDateTime < scheduledExitDateTime
-        ) {
+        if (exitDate && indiaNow.date !== exitDate) {
             return res.status(403).json({
                 success: false,
                 message:
-                    `Exit is not allowed before ${scheduledExitDateTime}`
+                    `Exit is allowed only on ${exitDate}. Current date: ${indiaNow.date}.`
             });
         }
 
-        const now = new Date();
+        const now = `${indiaNow.date} ${indiaNow.time}`;
 
         const [result] = await db.query(
             `
@@ -521,7 +511,8 @@ const recordEntry = async (req, res) => {
             });
         }
 
-        const now = new Date();
+        const indiaNow = getIndiaNowParts();
+        const now = `${indiaNow.date} ${indiaNow.time}`;
 
         const [result] = await db.query(
             `

@@ -16,6 +16,7 @@ const getAllGatePasses = async (req, res) => {
                 gp.out_date,
                 gp.return_date,
                 gp.out_time,
+                gp.return_time,
                 gp.exit_datetime,
                 gp.entry_datetime,
                 gp.rector,
@@ -34,12 +35,17 @@ const getAllGatePasses = async (req, res) => {
                 s.college,
                 s.course,
                 s.hostel,
-                s.photo
+                s.photo,
+                r.name AS rector_name,
+                r.mobile AS rector_mobile
 
             FROM gate_pass gp
 
             INNER JOIN students s
                 ON gp.student_id = s.id
+
+            LEFT JOIN rectors r
+                ON gp.approved_by_rector_id = r.id
 
             ORDER BY gp.created_at DESC, gp.id DESC
         `);
@@ -76,6 +82,7 @@ const getPendingGatePasses = async (req, res) => {
                 gp.out_date,
                 gp.return_date,
                 gp.out_time,
+                gp.return_time,
                 gp.rector,
                 gp.created_at,
                 gp.otp_verified,
@@ -88,12 +95,17 @@ const getPendingGatePasses = async (req, res) => {
                 s.college,
                 s.course,
                 s.hostel,
-                s.photo
+                s.photo,
+                r.name AS rector_name,
+                r.mobile AS rector_mobile
 
             FROM gate_pass gp
 
             INNER JOIN students s
                 ON gp.student_id = s.id
+
+            LEFT JOIN rectors r
+                ON gp.approved_by_rector_id = r.id
 
             WHERE gp.rector = 'Pending'
             AND gp.parent_decision = 'Approved'
@@ -145,12 +157,17 @@ const getGatePassById = async (req, res) => {
                 s.college,
                 s.course,
                 s.hostel,
-                s.photo
+                s.photo,
+                r.name AS rector_name,
+                r.mobile AS rector_mobile
 
             FROM gate_pass gp
 
             INNER JOIN students s
                 ON gp.student_id = s.id
+
+            LEFT JOIN rectors r
+                ON gp.approved_by_rector_id = r.id
 
             WHERE gp.id = ?
 
@@ -190,11 +207,38 @@ const getGatePassById = async (req, res) => {
 const approveGatePass = async (req, res) => {
     try {
         const { id } = req.params;
+        const rectorId = req.body?.rector_id || req.body?.rectorId;
 
         if (!id) {
             return res.status(400).json({
                 success: false,
                 message: "Gate pass ID is required."
+            });
+        }
+
+        if (!rectorId) {
+            return res.status(400).json({
+                success: false,
+                message: "Rector ID is required to approve this gate pass."
+            });
+        }
+
+        const [rectorRows] = await db.query(
+            `SELECT id, name, mobile, status FROM rectors WHERE id = ? LIMIT 1`,
+            [rectorId]
+        );
+
+        if (rectorRows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Rector account not found."
+            });
+        }
+
+        if (String(rectorRows[0].status || "").toLowerCase() !== "active") {
+            return res.status(403).json({
+                success: false,
+                message: "Inactive rector cannot approve a gate pass."
             });
         }
 
@@ -258,16 +302,19 @@ const approveGatePass = async (req, res) => {
             UPDATE gate_pass
             SET
                 rector = 'Approved',
-                qr_code = ?
+                qr_code = ?,
+                approved_by_rector_id = ?
             WHERE id = ?
             `,
-            [qrCode, id]
+            [qrCode, rectorId, id]
         );
 
         return res.status(200).json({
             success: true,
             message: "Gate pass approved successfully and QR code generated.",
-            qr_code: qrCode
+            qr_code: qrCode,
+            rector_name: rectorRows[0].name,
+            rector_mobile: rectorRows[0].mobile
         });
 
     } catch (error) {

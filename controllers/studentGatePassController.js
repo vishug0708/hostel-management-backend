@@ -104,7 +104,8 @@ const applyGatePass = async (req, res) => {
             destination,
             out_date,
             return_date,
-            out_time
+            out_time,
+            return_time
         } = req.body;
 
         // --------------------------------------------------
@@ -117,11 +118,24 @@ const applyGatePass = async (req, res) => {
             !destination ||
             !out_date ||
             !return_date ||
-            !out_time
+            !out_time ||
+            !return_time
         ) {
             return res.status(400).json({
                 success: false,
                 message: "All gate pass fields are required."
+            });
+        }
+
+        const exitDate = String(out_date).slice(0, 10);
+        const returnDate = String(return_date).slice(0, 10);
+        const exitTime = String(out_time).slice(0, 8);
+        const returnTime = String(return_time).slice(0, 8);
+
+        if (returnDate < exitDate || (returnDate === exitDate && returnTime <= exitTime)) {
+            return res.status(400).json({
+                success: false,
+                message: "Return date and time must be after exit date and time."
             });
         }
 
@@ -217,6 +231,7 @@ const applyGatePass = async (req, res) => {
                 out_date,
                 return_date,
                 out_time,
+                return_time,
                 rector,
                 created_at,
                 verification_code,
@@ -231,6 +246,7 @@ const applyGatePass = async (req, res) => {
             )
             VALUES
             (
+                ?,
                 ?,
                 ?,
                 ?,
@@ -257,6 +273,7 @@ const applyGatePass = async (req, res) => {
                 out_date,
                 return_date,
                 out_time,
+                return_time,
                 crypto.randomBytes(32).toString("hex"),
                 otp,
                 otpExpiry
@@ -362,6 +379,7 @@ const getMyGatePasses = async (req, res) => {
                 gp.out_date,
                 gp.return_date,
                 gp.out_time,
+                gp.return_time,
                 gp.exit_datetime,
                 gp.entry_datetime,
                 gp.rector,
@@ -384,12 +402,17 @@ const getMyGatePasses = async (req, res) => {
                 s.college,
                 s.course,
                 s.hostel,
-                s.photo
+                s.photo,
+                r.name AS rector_name,
+                r.mobile AS rector_mobile
 
              FROM gate_pass gp
 
              INNER JOIN students s
                 ON gp.student_id = s.id
+
+             LEFT JOIN rectors r
+                ON gp.approved_by_rector_id = r.id
 
              WHERE gp.student_id = ?
 
@@ -444,6 +467,7 @@ const getGatePassById = async (req, res) => {
                 gp.out_date,
                 gp.return_date,
                 gp.out_time,
+                gp.return_time,
                 gp.exit_datetime,
                 gp.entry_datetime,
                 gp.rector,
@@ -462,12 +486,18 @@ const getGatePassById = async (req, res) => {
                 s.parent_email,
                 s.college,
                 s.course,
-                s.hostel
+                s.hostel,
+                s.photo,
+                r.name AS rector_name,
+                r.mobile AS rector_mobile
 
             FROM gate_pass gp
 
             INNER JOIN students s
                 ON gp.student_id = s.id
+
+            LEFT JOIN rectors r
+                ON gp.approved_by_rector_id = r.id
 
             WHERE gp.id = ?
             AND gp.student_id = ?

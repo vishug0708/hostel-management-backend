@@ -20,7 +20,8 @@ const studentLogin = async (req, res) => {
                 name,
                 email,
                 password,
-                mobile 
+                mobile,
+                photo
             FROM students
             WHERE email = ?
             LIMIT 1
@@ -84,6 +85,7 @@ const studentLogin = async (req, res) => {
                 name: student.name,
                 email: student.email,
                 mobile: student.mobile,
+                photo: student.photo,
                 role: "student"
             }
         });

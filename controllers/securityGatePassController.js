@@ -69,6 +69,7 @@ const getGatePassForScan = async (qrValue) => {
             gp.exit_datetime,
             gp.entry_datetime,
             gp.rector,
+            gp.parent_decision,
             gp.verification_code,
             gp.qr_code,
             gp.otp_verified,
@@ -157,6 +158,7 @@ const buildGatePassResponse = (gatePass, action = null) => {
         entry_datetime: gatePass.entry_datetime,
 
         rector: gatePass.rector,
+        parent_decision: gatePass.parent_decision,
         otp_verified: gatePass.otp_verified,
 
         security_exit: gatePass.security_exit,
@@ -201,11 +203,30 @@ const scanGatePass = async (req, res) => {
         // PARENT OTP
         // --------------------------------------------------
 
+        if (gatePass.parent_decision !== "Approved") {
+            return res.status(403).json({
+                success: false,
+                action: "PARENT_NOT_APPROVED",
+                message:
+                    gatePass.parent_decision === "Rejected"
+                        ? "Gate Pass has been rejected by the parent."
+                        : "Parent approval is required before security can process this gate pass.",
+                gatePass: buildGatePassResponse(
+                    gatePass,
+                    "PARENT_NOT_APPROVED"
+                )
+            });
+        }
+
         if (gatePass.otp_verified !== "Yes") {
             return res.status(403).json({
                 success: false,
-                message: "Parent OTP is not verified",
-                gatePass: buildGatePassResponse(gatePass)
+                action: "PARENT_OTP_NOT_VERIFIED",
+                message: "Parent OTP verification is incomplete.",
+                gatePass: buildGatePassResponse(
+                    gatePass,
+                    "PARENT_OTP_NOT_VERIFIED"
+                )
             });
         }
 
@@ -372,6 +393,7 @@ const recordExit = async (req, res) => {
                 out_time,
                 return_date,
                 rector,
+                parent_decision,
                 otp_verified,
                 security_exit,
                 security_entry
@@ -391,10 +413,17 @@ const recordExit = async (req, res) => {
 
         const gatePass = rows[0];
 
+        if (gatePass.parent_decision !== "Approved") {
+            return res.status(403).json({
+                success: false,
+                message: "Parent approval is required before student exit."
+            });
+        }
+
         if (gatePass.otp_verified !== "Yes") {
             return res.status(403).json({
                 success: false,
-                message: "Parent OTP is not verified"
+                message: "Parent OTP verification is incomplete."
             });
         }
 
@@ -487,6 +516,7 @@ const recordEntry = async (req, res) => {
             SELECT
                 id,
                 rector,
+                parent_decision,
                 otp_verified,
                 security_exit,
                 security_entry
@@ -506,10 +536,17 @@ const recordEntry = async (req, res) => {
 
         const gatePass = rows[0];
 
+        if (gatePass.parent_decision !== "Approved") {
+            return res.status(403).json({
+                success: false,
+                message: "Parent approval is required before student entry."
+            });
+        }
+
         if (gatePass.otp_verified !== "Yes") {
             return res.status(403).json({
                 success: false,
-                message: "Parent OTP is not verified"
+                message: "Parent OTP verification is incomplete."
             });
         }
 

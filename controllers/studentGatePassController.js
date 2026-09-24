@@ -404,7 +404,7 @@ const getMyGatePasses = async (req, res) => {
                 s.hostel,
                 s.photo,
                 r.name AS rector_name,
-                r.mobile AS rector_mobile
+                r.phone AS rector_mobile
 
              FROM gate_pass gp
 
@@ -489,7 +489,7 @@ const getGatePassById = async (req, res) => {
                 s.hostel,
                 s.photo,
                 r.name AS rector_name,
-                r.mobile AS rector_mobile
+                r.phone AS rector_mobile
 
             FROM gate_pass gp
 

@@ -37,7 +37,7 @@ const getAllGatePasses = async (req, res) => {
                 s.hostel,
                 s.photo,
                 r.name AS rector_name,
-                r.mobile AS rector_mobile
+                r.phone AS rector_mobile
 
             FROM gate_pass gp
 
@@ -97,7 +97,7 @@ const getPendingGatePasses = async (req, res) => {
                 s.hostel,
                 s.photo,
                 r.name AS rector_name,
-                r.mobile AS rector_mobile
+                r.phone AS rector_mobile
 
             FROM gate_pass gp
 
@@ -159,7 +159,7 @@ const getGatePassById = async (req, res) => {
                 s.hostel,
                 s.photo,
                 r.name AS rector_name,
-                r.mobile AS rector_mobile
+                r.phone AS rector_mobile
 
             FROM gate_pass gp
 
@@ -224,7 +224,7 @@ const approveGatePass = async (req, res) => {
         }
 
         const [rectorRows] = await db.query(
-            `SELECT id, name, mobile, status FROM rectors WHERE id = ? LIMIT 1`,
+            `SELECT id, name, phone, status FROM rectors WHERE id = ? LIMIT 1`,
             [rectorId]
         );
 
@@ -314,7 +314,7 @@ const approveGatePass = async (req, res) => {
             message: "Gate pass approved successfully and QR code generated.",
             qr_code: qrCode,
             rector_name: rectorRows[0].name,
-            rector_mobile: rectorRows[0].mobile
+            rector_mobile: rectorRows[0].phone
         });
 
     } catch (error) {

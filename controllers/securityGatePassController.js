@@ -263,21 +263,6 @@ const scanGatePass = async (req, res) => {
         // --------------------------------------------------
 
         if (gatePass.security_exit !== "Yes") {
-            const exitDate = String(gatePass.out_date || "").slice(0, 10);
-
-            if (exitDate && indiaNow.date !== exitDate) {
-                return res.status(403).json({
-                    success: false,
-                    action: "EXIT_DATE_MISMATCH",
-                    message:
-                        `Exit is allowed only on ${exitDate}. Current date: ${indiaNow.date}.`,
-                    gatePass: buildGatePassResponse(
-                        gatePass,
-                        "EXIT_DATE_MISMATCH"
-                    )
-                });
-            }
-
             return res.status(200).json({
                 success: true,
                 action: "EXIT",
@@ -398,17 +383,7 @@ const recordExit = async (req, res) => {
         const indiaNow = getIndiaNowParts();
         const currentDateTime = `${indiaNow.date} ${indiaNow.time}`;
 
-        const exitDate = String(gatePass.out_date || "").slice(0, 10);
-
-        if (exitDate && indiaNow.date !== exitDate) {
-            return res.status(403).json({
-                success: false,
-                message:
-                    `Exit is allowed only on ${exitDate}. Current date: ${indiaNow.date}.`
-            });
-        }
-
-        const now = `${indiaNow.date} ${indiaNow.time}`;
+        const now = currentDateTime;
 
         const [result] = await db.query(
             `

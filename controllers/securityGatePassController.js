@@ -30,23 +30,65 @@ const getIndiaNowParts = () => {
     };
 };
 
-const getGatePassDateTime = (dateValue, timeValue = "00:00:00") => {
+const normalizeDatabaseDate = (dateValue) => {
     if (!dateValue) {
         return null;
     }
 
-    const date = String(dateValue).slice(0, 10);
+    // mysql2 can return MySQL DATE values as JavaScript Date objects.
+    // Convert them safely to YYYY-MM-DD before comparing dates.
+    if (dateValue instanceof Date && !Number.isNaN(dateValue.getTime())) {
+        const year = dateValue.getFullYear();
+        const month = String(dateValue.getMonth() + 1).padStart(2, "0");
+        const day = String(dateValue.getDate()).padStart(2, "0");
+
+        return `${year}-${month}-${day}`;
+    }
+
+    const value = String(dateValue).trim();
+
+    // Already an ISO MySQL date/datetime.
+    const isoMatch = value.match(/^(\d{4}-\d{2}-\d{2})/);
+
+    if (isoMatch) {
+        return isoMatch[1];
+    }
+
+    // Fallback for values such as:
+    // Sat Sep 26 2026 00:00:00 GMT+0000
+    const parsed = new Date(value);
+
+    if (!Number.isNaN(parsed.getTime())) {
+        const year = parsed.getFullYear();
+        const month = String(parsed.getMonth() + 1).padStart(2, "0");
+        const day = String(parsed.getDate()).padStart(2, "0");
+
+        return `${year}-${month}-${day}`;
+    }
+
+    return null;
+};
+
+const getGatePassDateTime = (dateValue, timeValue = "00:00:00") => {
+    const date = normalizeDatabaseDate(dateValue);
+
+    if (!date) {
+        return null;
+    }
+
     const time = String(timeValue || "00:00:00").slice(0, 8);
 
     return `${date} ${time}`;
 };
 
 const getReturnEndDateTime = (returnDate) => {
-    if (!returnDate) {
+    const date = normalizeDatabaseDate(returnDate);
+
+    if (!date) {
         return null;
     }
 
-    return `${String(returnDate).slice(0, 10)} 23:59:59`;
+    return `${date} 23:59:59`;
 };
 
 // ======================================================
@@ -248,7 +290,7 @@ const scanGatePass = async (req, res) => {
         // Exit is allowed only on the selected exit date. The selected
         // exit TIME is informational; security may scan before or after it.
         if (gatePass.security_exit !== "Yes") {
-            const exitDate = String(gatePass.out_date || "").slice(0, 10);
+            const exitDate = normalizeDatabaseDate(gatePass.out_date);
 
             if (exitDate && indiaNow.date < exitDate) {
                 return res.status(403).json({
@@ -450,7 +492,7 @@ const recordExit = async (req, res) => {
 
         const indiaNow = getIndiaNowParts();
         const currentDateTime = `${indiaNow.date} ${indiaNow.time}`;
-        const exitDate = String(gatePass.out_date || "").slice(0, 10);
+        const exitDate = normalizeDatabaseDate(gatePass.out_date);
 
         if (exitDate && indiaNow.date !== exitDate) {
             return res.status(403).json({
@@ -574,7 +616,7 @@ const recordEntry = async (req, res) => {
         }
 
         const indiaNow = getIndiaNowParts();
-        const returnDate = String(gatePass.return_date || "").slice(0, 10);
+        const returnDate = normalizeDatabaseDate(gatePass.return_date);
 
         if (returnDate && indiaNow.date > returnDate) {
             return res.status(403).json({

@@ -503,7 +503,8 @@ const recordExit = async (req, res) => {
             });
         }
 
-        // Scheduled exit TIME is intentionally not checked.
+        // Exit time selected by student is informational.
+        // Security can scan before or after the selected time.
         const now = currentDateTime;
 
         const [result] = await db.query(
@@ -511,7 +512,7 @@ const recordExit = async (req, res) => {
             UPDATE gate_pass
             SET
                 security_exit = 'Yes',
-                exit_datetime = ?
+                security_exit_time = ?
             WHERE id = ?
               AND security_exit = 'No'
               AND security_entry = 'No'
@@ -522,8 +523,7 @@ const recordExit = async (req, res) => {
         if (result.affectedRows === 0) {
             return res.status(409).json({
                 success: false,
-                message:
-                    "Exit was already recorded or gate pass was completed."
+                message: "Exit was already recorded or gate pass was completed."
             });
         }
 

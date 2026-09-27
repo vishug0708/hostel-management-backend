@@ -9,12 +9,10 @@ const {
     getStudentDashboard,
     getStudentRoom,
     getStudentLeaves,
-    getStudentAttendance,
-    getStudentComplaints
+    getStudentAttendance
 } = require("../controllers/studentController");
 
 const router = express.Router();
-
 
 // ===============================
 // MULTER STORAGE
@@ -35,17 +33,12 @@ const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, uploadDirectory);
     },
-
     filename: (req, file, cb) => {
         const extension = path.extname(file.originalname);
-
-        const fileName =
-            `student-${req.params.id}-${Date.now()}${extension}`;
-
+        const fileName = `student-${req.params.id}-${Date.now()}${extension}`;
         cb(null, fileName);
     }
 });
-
 
 // ===============================
 // FILE FILTER
@@ -71,7 +64,6 @@ const fileFilter = (req, file, cb) => {
     }
 };
 
-
 const upload = multer({
     storage,
     fileFilter,
@@ -79,7 +71,6 @@ const upload = multer({
         fileSize: 5 * 1024 * 1024
     }
 });
-
 
 // ===============================
 // STUDENT DASHBOARD
@@ -90,7 +81,6 @@ router.get(
     getStudentDashboard
 );
 
-
 // ===============================
 // STUDENT PROFILE
 // ===============================
@@ -99,7 +89,6 @@ router.get(
     "/profile/:id",
     getStudentProfile
 );
-
 
 // ===============================
 // UPDATE STUDENT PROFILE
@@ -111,7 +100,6 @@ router.put(
     updateStudentProfile
 );
 
-
 // ===============================
 // STUDENT ROOM
 // ===============================
@@ -120,7 +108,6 @@ router.get(
     "/room/:id",
     getStudentRoom
 );
-
 
 // ===============================
 // STUDENT LEAVE REQUESTS
@@ -131,7 +118,6 @@ router.get(
     getStudentLeaves
 );
 
-
 // ===============================
 // STUDENT ATTENDANCE
 // ===============================
@@ -140,16 +126,5 @@ router.get(
     "/attendance/:id",
     getStudentAttendance
 );
-
-
-// ===============================
-// STUDENT COMPLAINTS
-// ===============================
-
-router.get(
-    "/complaints/:id",
-    getStudentComplaints
-);
-
 
 module.exports = router;

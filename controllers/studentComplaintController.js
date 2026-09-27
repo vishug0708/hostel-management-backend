@@ -187,10 +187,9 @@ const createComplaint = async (req, res) => {
                     assigned_staff_name,
                     assigned_staff_mobile,
                     assigned_staff_photo,
-                    assigned_staff_role,
                     assigned_at,
                     status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'Assigned')`,
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'Assigned')`,
                 [
                     complaintCode,
                     studentId,
@@ -202,8 +201,7 @@ const createComplaint = async (req, res) => {
                     assignedStaff.id,
                     assignedStaff.name,
                     assignedStaff.mobile,
-                    assignedStaff.photo,
-                    assignedStaff.role
+                    assignedStaff.photo
                 ]
             );
             await connection.commit();
@@ -259,7 +257,7 @@ const getStudentComplaints = async (req, res) => {
                 c.assigned_staff_name,
                 c.assigned_staff_mobile,
                 c.assigned_staff_photo,
-                c.assigned_staff_role,
+                st.role AS assigned_staff_role,
                 c.assigned_at,
                 c.expected_resolution_at,
                 c.status,
@@ -276,6 +274,7 @@ const getStudentComplaints = async (req, res) => {
                 c.created_at,
                 c.updated_at
              FROM complaints c
+             LEFT JOIN staff st ON st.id = c.assigned_staff_id
              WHERE c.student_id = ?
              ORDER BY c.id DESC`,
             [requestedStudentId]
@@ -303,7 +302,7 @@ const getComplaintById = async (complaintId, studentId) => {
             c.assigned_staff_name,
             c.assigned_staff_mobile,
             c.assigned_staff_photo,
-            c.assigned_staff_role,
+            st.role AS assigned_staff_role,
             c.assigned_at,
             c.expected_resolution_at,
             c.status,
@@ -330,6 +329,7 @@ const getComplaintById = async (complaintId, studentId) => {
             r.room_no,
             r.block
          FROM complaints c
+         LEFT JOIN staff st ON st.id = c.assigned_staff_id
          LEFT JOIN students s ON s.id = c.student_id
          LEFT JOIN students bs ON bs.id = c.backup_student_id
          LEFT JOIN room_allocation ra ON ra.student_id = c.student_id AND ra.status = 'Allocated'

@@ -1,5 +1,5 @@
-import express from "express";
-import {
+const express = require("express");
+const {
     getAllComplaints,
     getComplaintDetails,
     getComplaintsByStatus,
@@ -13,8 +13,8 @@ import {
     exportComplaintReport,
     getResolutionTimeByCategory,
     getComplaintsTrend
-} from "../controllers/rectorComplaintController.js";
-import { authMiddleware } from "../middlewares/authMiddleware.js";
+} = require("../controllers/rectorComplaintController.js");
+const { authMiddleware } = require("../middlewares/authMiddleware.js");
 
 const router = express.Router();
 
@@ -33,4 +33,4 @@ router.get("/complaints/report/export", authMiddleware, exportComplaintReport);
 router.get("/complaints/analytics/resolution-time", authMiddleware, getResolutionTimeByCategory);
 router.get("/complaints/analytics/trends", authMiddleware, getComplaintsTrend);
 
-export default router;
+module.exports = router;

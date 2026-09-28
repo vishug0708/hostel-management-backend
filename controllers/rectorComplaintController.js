@@ -1,7 +1,7 @@
-import db from "../config/database.js";
+const db = require("../config/database.js");
 
 // Get all complaints (rector monitoring only)
-export const getAllComplaints = async (req, res) => {
+const getAllComplaints = async (req, res) => {
     try {
         const [complaints] = await db.query(
             `SELECT
@@ -54,7 +54,7 @@ export const getAllComplaints = async (req, res) => {
 };
 
 // Get single complaint details (rector monitoring)
-export const getComplaintDetails = async (req, res) => {
+const getComplaintDetails = async (req, res) => {
     try {
         const { complaintId } = req.params;
         if (!complaintId) return res.status(400).json({ success: false, message: "Complaint ID is required." });
@@ -118,7 +118,7 @@ export const getComplaintDetails = async (req, res) => {
 };
 
 // Get complaints by status
-export const getComplaintsByStatus = async (req, res) => {
+const getComplaintsByStatus = async (req, res) => {
     try {
         const { status } = req.params;
         if (!status) return res.status(400).json({ success: false, message: "Status is required." });
@@ -158,7 +158,7 @@ export const getComplaintsByStatus = async (req, res) => {
 };
 
 // Get complaints by category
-export const getComplaintsByCategory = async (req, res) => {
+const getComplaintsByCategory = async (req, res) => {
     try {
         const { category } = req.params;
         if (!category) return res.status(400).json({ success: false, message: "Category is required." });
@@ -193,7 +193,7 @@ export const getComplaintsByCategory = async (req, res) => {
 };
 
 // Get complaint statistics for rector dashboard
-export const getComplaintStatistics = async (req, res) => {
+const getComplaintStatistics = async (req, res) => {
     try {
         const [stats] = await db.query(
             `SELECT
@@ -220,7 +220,7 @@ export const getComplaintStatistics = async (req, res) => {
 };
 
 // Get staff performance on complaints
-export const getStaffPerformance = async (req, res) => {
+const getStaffPerformance = async (req, res) => {
     try {
         const [performance] = await db.query(
             `SELECT
@@ -252,7 +252,7 @@ export const getStaffPerformance = async (req, res) => {
 };
 
 // Get complaints by student
-export const getStudentComplaints = async (req, res) => {
+const getStudentComplaints = async (req, res) => {
     try {
         const { studentId } = req.params;
         if (!studentId) return res.status(400).json({ success: false, message: "Student ID is required." });
@@ -285,7 +285,7 @@ export const getStudentComplaints = async (req, res) => {
 };
 
 // Get pending resolutions (rector view only)
-export const getPendingResolutions = async (req, res) => {
+const getPendingResolutions = async (req, res) => {
     try {
         const [complaints] = await db.query(
             `SELECT
@@ -318,7 +318,7 @@ export const getPendingResolutions = async (req, res) => {
 };
 
 // Get overdue complaints
-export const getOverdueComplaints = async (req, res) => {
+const getOverdueComplaints = async (req, res) => {
     try {
         const [complaints] = await db.query(
             `SELECT
@@ -352,7 +352,7 @@ export const getOverdueComplaints = async (req, res) => {
 };
 
 // Get closed complaints with ratings
-export const getClosedComplaintsWithRatings = async (req, res) => {
+const getClosedComplaintsWithRatings = async (req, res) => {
     try {
         const [complaints] = await db.query(
             `SELECT
@@ -386,7 +386,7 @@ export const getClosedComplaintsWithRatings = async (req, res) => {
 };
 
 // Export complaint report with filters
-export const exportComplaintReport = async (req, res) => {
+const exportComplaintReport = async (req, res) => {
     try {
         const { startDate, endDate, status, category } = req.query;
 
@@ -447,7 +447,7 @@ export const exportComplaintReport = async (req, res) => {
 };
 
 // Get average resolution time by category
-export const getResolutionTimeByCategory = async (req, res) => {
+const getResolutionTimeByCategory = async (req, res) => {
     try {
         const [stats] = await db.query(
             `SELECT
@@ -472,7 +472,7 @@ export const getResolutionTimeByCategory = async (req, res) => {
 };
 
 // Get daily complaints trends
-export const getComplaintsTrend = async (req, res) => {
+const getComplaintsTrend = async (req, res) => {
     try {
         const { days = 30 } = req.query;
 
@@ -497,4 +497,20 @@ export const getComplaintsTrend = async (req, res) => {
         console.error("Get Complaints Trend Error:", error);
         res.status(500).json({ success: false, message: "Failed to fetch trends.", error: error.message });
     }
+};
+
+module.exports = {
+    getAllComplaints,
+    getComplaintDetails,
+    getComplaintsByStatus,
+    getComplaintsByCategory,
+    getComplaintStatistics,
+    getStaffPerformance,
+    getStudentComplaints,
+    getPendingResolutions,
+    getOverdueComplaints,
+    getClosedComplaintsWithRatings,
+    exportComplaintReport,
+    getResolutionTimeByCategory,
+    getComplaintsTrend
 };

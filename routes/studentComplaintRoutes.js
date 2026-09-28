@@ -2,6 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const authMiddleware = require("../middleware/authMiddleware");
 
 const {
     getBackupStudents,
@@ -45,9 +46,9 @@ const upload = multer({
 });
 
 // IMPORTANT: keep this route before /:studentId.
-router.get("/backup-students/:studentId", getBackupStudents);
-router.post("/", upload.single("attachment"), createComplaint);
-router.get("/:studentId", getStudentComplaints);
-router.get("/:studentId/:complaintId", getComplaintById);
+router.get("/backup-students/:studentId", authMiddleware, getBackupStudents);
+router.post("/", authMiddleware, upload.single("attachment"), createComplaint);
+router.get("/:studentId", authMiddleware, getStudentComplaints);
+router.get("/:studentId/:complaintId", authMiddleware, getComplaintById);
 
 module.exports = router;

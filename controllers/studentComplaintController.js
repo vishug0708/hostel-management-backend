@@ -26,34 +26,29 @@ const getStudentComplaints = async (req, res) => {
 
     const [complaints] = await db.query(
       `SELECT
-                c.id,
-                c.complaint_code,
-                c.student_id,
-                c.backup_student_id,
-                c.backup_student_name,
-                c.backup_student_mobile,
-                c.backup_student_email,
-                c.backup_student_photo,
-                c.category,
-                c.subject,
-                c.description,
-                c.attachment,
-                c.assigned_staff_id,
-                c.assigned_staff_name,
-                c.assigned_staff_mobile,
-                c.assigned_staff_photo,
-                st.role AS assigned_staff_role,
-                c.status,
-                c.created_at,
-                c.expected_resolution_at,
-                c.resolution_note,
-                c.otp_verified,
-                c.closed_at,
-                c.rating
-            FROM complaints c
-            LEFT JOIN staff st ON st.id = c.assigned_staff_id
-            WHERE c.student_id = ?
-            ORDER BY c.created_at DESC`,
+        c.id,
+        c.complaint_code,
+        c.student_id,
+        c.category,
+        c.subject,
+        c.description,
+        c.attachment,
+        c.assigned_staff_id,
+        c.assigned_staff_name,
+        c.assigned_staff_mobile,
+        c.assigned_staff_photo,
+        st.role AS assigned_staff_role,
+        c.status,
+        c.created_at,
+        c.expected_resolution_at,
+        c.resolution_note,
+        c.otp_verified,
+        c.closed_at,
+        c.rating
+      FROM complaints c
+      LEFT JOIN staff st ON st.id = c.assigned_staff_id
+      WHERE c.student_id = ?
+      ORDER BY c.created_at DESC`,
       [studentId],
     );
 
@@ -88,34 +83,29 @@ const getComplaintById = async (req, res) => {
 
     const [complaint] = await db.query(
       `SELECT
-                c.id,
-                c.complaint_code,
-                c.student_id,
-                c.backup_student_id,
-                c.backup_student_name,
-                c.backup_student_mobile,
-                c.backup_student_email,
-                c.backup_student_photo,
-                c.category,
-                c.subject,
-                c.description,
-                c.attachment,
-                c.assigned_staff_id,
-                c.assigned_staff_name,
-                c.assigned_staff_mobile,
-                c.assigned_staff_photo,
-                st.role AS assigned_staff_role,
-                c.status,
-                c.created_at,
-                c.expected_resolution_at,
-                c.resolution_note,
-                c.otp_verified,
-                c.closed_at,
-                c.rating,
-                c.rating_feedback
-            FROM complaints c
-            LEFT JOIN staff st ON st.id = c.assigned_staff_id
-            WHERE c.student_id = ? AND c.id = ?`,
+        c.id,
+        c.complaint_code,
+        c.student_id,
+        c.category,
+        c.subject,
+        c.description,
+        c.attachment,
+        c.assigned_staff_id,
+        c.assigned_staff_name,
+        c.assigned_staff_mobile,
+        c.assigned_staff_photo,
+        st.role AS assigned_staff_role,
+        c.status,
+        c.created_at,
+        c.expected_resolution_at,
+        c.resolution_note,
+        c.otp_verified,
+        c.closed_at,
+        c.rating,
+        c.rating_feedback
+      FROM complaints c
+      LEFT JOIN staff st ON st.id = c.assigned_staff_id
+      WHERE c.student_id = ? AND c.id = ?`,
       [studentId, complaintId],
     );
 
@@ -143,16 +133,9 @@ const getComplaintById = async (req, res) => {
 // Create new complaint with automatic staff assignment
 const createComplaint = async (req, res) => {
   try {
-    const { student_id, backup_student_id, category, subject, description } =
-      req.body;
+    const { student_id, category, subject, description } = req.body;
 
-    if (
-      !student_id ||
-      !backup_student_id ||
-      !category ||
-      !subject ||
-      !description
-    ) {
+    if (!student_id || !category || !subject || !description) {
       return res
         .status(400)
         .json({
@@ -160,18 +143,6 @@ const createComplaint = async (req, res) => {
           message: "All required fields must be filled.",
         });
     }
-
-    // Get backup student details
-    const [backupStudent] = await db.query(
-      "SELECT id, name, mobile, email, photo FROM students WHERE id = ?",
-      [backup_student_id],
-    );
-    if (!backupStudent || backupStudent.length === 0)
-      return res
-        .status(404)
-        .json({ success: false, message: "Backup student not found." });
-
-    const backup = backupStudent[0];
 
     // Get staff with least active complaints in the selected category
     const [staff] = await db.query(
@@ -200,20 +171,13 @@ const createComplaint = async (req, res) => {
 
     const [result] = await db.query(
       `INSERT INTO complaints (
-                complaint_code, student_id, backup_student_id, backup_student_name,
-                backup_student_mobile, backup_student_email, backup_student_photo,
-                category, subject, description, attachment, assigned_staff_id,
-                assigned_staff_name, assigned_staff_mobile, assigned_staff_photo,
+                complaint_code, student_id, category, subject, description, attachment,
+                assigned_staff_id, assigned_staff_name, assigned_staff_mobile, assigned_staff_photo,
                 assigned_by_id, assigned_by_type, assigned_at, status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         complaintCode,
         student_id,
-        backup_student_id,
-        backup.name,
-        backup.mobile,
-        backup.email,
-        getPhotoUrl(backup.photo),
         category,
         subject,
         description,
@@ -361,7 +325,6 @@ const sendOtpVerification = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Complaint not found." });
 
-    // Send email with OTP (integrate your email service here)
     console.log(`OTP for complaint ${complaintId}: ${otp}`);
 
     res.json({
@@ -507,13 +470,13 @@ const getComplaintStats = async (req, res) => {
 
     const [stats] = await db.query(
       `SELECT
-                COUNT(*) as total,
-                SUM(CASE WHEN status = 'Closed' THEN 1 ELSE 0 END) as closed,
-                SUM(CASE WHEN status IN ('Submitted', 'Assigned') THEN 1 ELSE 0 END) as pending,
-                SUM(CASE WHEN status IN ('In Progress', 'Resolution Pending') THEN 1 ELSE 0 END) as in_progress,
-                AVG(CASE WHEN rating IS NOT NULL THEN rating ELSE NULL END) as avg_rating
-            FROM complaints
-            WHERE student_id = ?`,
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'Closed' THEN 1 ELSE 0 END) as closed,
+        SUM(CASE WHEN status IN ('Submitted', 'Assigned') THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN status IN ('In Progress', 'Resolution Pending') THEN 1 ELSE 0 END) as in_progress,
+        AVG(CASE WHEN rating IS NOT NULL THEN rating ELSE NULL END) as avg_rating
+      FROM complaints
+      WHERE student_id = ?`,
       [studentId],
     );
 

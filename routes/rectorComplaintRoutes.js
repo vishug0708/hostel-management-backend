@@ -14,7 +14,7 @@ const {
     getResolutionTimeByCategory,
     getComplaintsTrend
 } = require("../controllers/rectorComplaintController.js");
-const { authMiddleware } = require("../middleware/authMiddleware.js");
+const authMiddleware = require("../middleware/authMiddleware.js");
 
 const router = express.Router();
 

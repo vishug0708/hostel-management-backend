@@ -7,7 +7,7 @@ const {
     getBackupStudents,
     createComplaint,
     getStudentComplaints,
-    getStudentComplaintDetails
+    getComplaintById
 } = require("../controllers/studentComplaintController");
 
 const router = express.Router();
@@ -48,6 +48,6 @@ const upload = multer({
 router.get("/backup-students/:studentId", getBackupStudents);
 router.post("/", upload.single("attachment"), createComplaint);
 router.get("/:studentId", getStudentComplaints);
-router.get("/:studentId/:complaintId", getStudentComplaintDetails);
+router.get("/:studentId/:complaintId", getComplaintById);
 
 module.exports = router;

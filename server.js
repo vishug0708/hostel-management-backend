@@ -49,6 +49,7 @@ const rectorRoomDeAllocationRoutes = require("./routes/rectorRoomDeAllocationRou
 const rectorCricketRoutes = require("./routes/rectorCricketRoutes");
 const rectorGatePassRoutes = require("./routes/rectorGatePassRoutes");
 const rectorSalaryRoutes = require("./routes/rectorSalaryRoutes");
+const rectorComplaintRoutes = require("./routes/rectorComplaintRoutes");
 
 
 // =====================================================
@@ -264,12 +265,11 @@ app.use(
 
 app.use("/api/rector/cricket-box", rectorCricketRoutes);
 
-app.use(
-    "/api/rector/gatepass",
-    rectorGatePassRoutes
-);
+app.use("/api/rector/gatepass", rectorGatePassRoutes);
 
 app.use("/api/rector/salary", rectorSalaryRoutes);
+
+app.use("/api/rector", rectorComplaintRoutes);
 
 
 

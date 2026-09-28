@@ -1,4 +1,4 @@
-import db from "../config/database.js";
+const db = require("../config/database.js");
 
 // Helper function to get photo URL
 const getPhotoUrl = (photo) => {
@@ -16,7 +16,7 @@ const getPhotoUrl = (photo) => {
 };
 
 // Get all complaints for a student
-export const getStudentComplaints = async (req, res) => {
+const getStudentComplaints = async (req, res) => {
   try {
     const { studentId } = req.params;
     if (!studentId)
@@ -25,7 +25,7 @@ export const getStudentComplaints = async (req, res) => {
         .json({ success: false, message: "Student ID is required." });
 
     const [complaints] = await db.query(
-      `SELECT 
+      `SELECT
                 c.id,
                 c.complaint_code,
                 c.student_id,
@@ -75,7 +75,7 @@ export const getStudentComplaints = async (req, res) => {
 };
 
 // Get single complaint by ID
-export const getComplaintById = async (req, res) => {
+const getComplaintById = async (req, res) => {
   try {
     const { studentId, complaintId } = req.params;
     if (!studentId || !complaintId)
@@ -87,7 +87,7 @@ export const getComplaintById = async (req, res) => {
         });
 
     const [complaint] = await db.query(
-      `SELECT 
+      `SELECT
                 c.id,
                 c.complaint_code,
                 c.student_id,
@@ -141,7 +141,7 @@ export const getComplaintById = async (req, res) => {
 };
 
 // Create new complaint with automatic staff assignment
-export const createComplaint = async (req, res) => {
+const createComplaint = async (req, res) => {
   try {
     const { student_id, backup_student_id, category, subject, description } =
       req.body;
@@ -200,9 +200,9 @@ export const createComplaint = async (req, res) => {
 
     const [result] = await db.query(
       `INSERT INTO complaints (
-                complaint_code, student_id, backup_student_id, backup_student_name, 
+                complaint_code, student_id, backup_student_id, backup_student_name,
                 backup_student_mobile, backup_student_email, backup_student_photo,
-                category, subject, description, attachment, assigned_staff_id, 
+                category, subject, description, attachment, assigned_staff_id,
                 assigned_staff_name, assigned_staff_mobile, assigned_staff_photo,
                 assigned_by_id, assigned_by_type, assigned_at, status, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
@@ -253,7 +253,7 @@ export const createComplaint = async (req, res) => {
 };
 
 // Get backup students for a student
-export const getBackupStudents = async (req, res) => {
+const getBackupStudents = async (req, res) => {
   try {
     const { studentId } = req.params;
     if (!studentId)
@@ -262,8 +262,8 @@ export const getBackupStudents = async (req, res) => {
         .json({ success: false, message: "Student ID is required." });
 
     const [students] = await db.query(
-      `SELECT id, student_id, name, mobile, email, hostel, photo 
-            FROM students 
+      `SELECT id, student_id, name, mobile, email, hostel, photo
+            FROM students
             WHERE id != ? AND status = 'Active'
             LIMIT 10`,
       [studentId],
@@ -286,7 +286,7 @@ export const getBackupStudents = async (req, res) => {
 };
 
 // Update complaint status (for staff)
-export const updateComplaintStatus = async (req, res) => {
+const updateComplaintStatus = async (req, res) => {
   try {
     const { complaintId } = req.params;
     const { status, resolution_note, expected_resolution_at } = req.body;
@@ -300,7 +300,7 @@ export const updateComplaintStatus = async (req, res) => {
         });
 
     const [result] = await db.query(
-      `UPDATE complaints 
+      `UPDATE complaints
             SET status = ?, resolution_note = ?, expected_resolution_at = ?, resolution_marked_at = NOW()
             WHERE id = ?`,
       [
@@ -333,7 +333,7 @@ export const updateComplaintStatus = async (req, res) => {
 };
 
 // Send OTP verification
-export const sendOtpVerification = async (req, res) => {
+const sendOtpVerification = async (req, res) => {
   try {
     const { complaintId, backup_student_email } = req.body;
 
@@ -350,7 +350,7 @@ export const sendOtpVerification = async (req, res) => {
     const otp_expires_at = new Date(Date.now() + 15 * 60 * 1000);
 
     const [result] = await db.query(
-      `UPDATE complaints 
+      `UPDATE complaints
             SET otp_hash = ?, otp_expires_at = ?, otp_attempts = 0
             WHERE id = ?`,
       [otp, otp_expires_at, complaintId],
@@ -382,7 +382,7 @@ export const sendOtpVerification = async (req, res) => {
 };
 
 // Verify OTP
-export const verifyOtp = async (req, res) => {
+const verifyOtp = async (req, res) => {
   try {
     const { complaintId, otp } = req.body;
 
@@ -431,7 +431,7 @@ export const verifyOtp = async (req, res) => {
     }
 
     const [result] = await db.query(
-      `UPDATE complaints 
+      `UPDATE complaints
             SET otp_verified = 'Yes', otp_verified_at = NOW(), status = 'OTP Verification'
             WHERE id = ?`,
       [complaintId],
@@ -454,7 +454,7 @@ export const verifyOtp = async (req, res) => {
 };
 
 // Submit complaint rating
-export const submitComplaintRating = async (req, res) => {
+const submitComplaintRating = async (req, res) => {
   try {
     const { complaintId } = req.params;
     const { rating, rating_feedback } = req.body;
@@ -473,7 +473,7 @@ export const submitComplaintRating = async (req, res) => {
         .json({ success: false, message: "Rating must be between 1 and 5." });
 
     const [result] = await db.query(
-      `UPDATE complaints 
+      `UPDATE complaints
             SET rating = ?, rating_feedback = ?, rated_at = NOW(), status = 'Closed', closed_at = NOW()
             WHERE id = ?`,
       [rating, rating_feedback || null, complaintId],
@@ -501,12 +501,12 @@ export const submitComplaintRating = async (req, res) => {
 };
 
 // Get complaint statistics for student
-export const getComplaintStats = async (req, res) => {
+const getComplaintStats = async (req, res) => {
   try {
     const { studentId } = req.params;
 
     const [stats] = await db.query(
-      `SELECT 
+      `SELECT
                 COUNT(*) as total,
                 SUM(CASE WHEN status = 'Closed' THEN 1 ELSE 0 END) as closed,
                 SUM(CASE WHEN status IN ('Submitted', 'Assigned') THEN 1 ELSE 0 END) as pending,
@@ -534,7 +534,7 @@ export const getComplaintStats = async (req, res) => {
 };
 
 // Delete complaint (only if status is Submitted)
-export const deleteComplaint = async (req, res) => {
+const deleteComplaint = async (req, res) => {
   try {
     const { complaintId } = req.params;
 
@@ -574,4 +574,17 @@ export const deleteComplaint = async (req, res) => {
         error: error.message,
       });
   }
+};
+
+module.exports = {
+  getStudentComplaints,
+  getComplaintById,
+  createComplaint,
+  getBackupStudents,
+  updateComplaintStatus,
+  sendOtpVerification,
+  verifyOtp,
+  submitComplaintRating,
+  getComplaintStats,
+  deleteComplaint,
 };

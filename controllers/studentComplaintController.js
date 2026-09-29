@@ -21,7 +21,9 @@ const getToken = (req) => {
 const verifyStudent = (req, res) => {
   const token = getToken(req);
   if (!token) {
-    res.status(401).json({ success: false, message: "Authentication token is required." });
+    res
+      .status(401)
+      .json({ success: false, message: "Authentication token is required." });
     return null;
   }
 
@@ -36,7 +38,9 @@ const verifyStudent = (req, res) => {
 
     return { ...decoded, studentId: Number(studentId) };
   } catch (error) {
-    res.status(401).json({ success: false, message: "Invalid or expired student token." });
+    res
+      .status(401)
+      .json({ success: false, message: "Invalid or expired student token." });
     return null;
   }
 };
@@ -44,7 +48,11 @@ const verifyStudent = (req, res) => {
 const getPhotoUrl = (photo) => {
   if (!photo) return null;
   const value = String(photo).trim();
-  if (value.startsWith("data:") || value.startsWith("blob:") || value.startsWith("http")) {
+  if (
+    value.startsWith("data:") ||
+    value.startsWith("blob:") ||
+    value.startsWith("http")
+  ) {
     return value;
   }
   const normalized = value.replace(/^\/+/, "");
@@ -89,7 +97,7 @@ const getBackupStudents = async (req, res) => {
         ON r.id = ra.room_id
       WHERE s.id <> ?
       ORDER BY s.name ASC`,
-      [requestedStudentId]
+      [requestedStudentId],
     );
 
     return res.json({ success: true, students: students || [] });
@@ -104,6 +112,21 @@ const getBackupStudents = async (req, res) => {
 };
 
 const getAvailableStaff = async (category) => {
+  const categoryRoleMap = {
+    Electrical: "Electrician",
+    Plumbing: "Plumber",
+    Carpenter: "Carpenter",
+    Cleaning: "Housekeeping",
+    IT: "IT",
+    Maintenance: "Maintenance",
+  };
+
+  const staffRole = categoryRoleMap[category];
+
+  if (!staffRole) {
+    return null;
+  }
+
   const [rows] = await db.query(
     `SELECT
       st.id,
@@ -113,16 +136,29 @@ const getAvailableStaff = async (category) => {
       st.mobile,
       st.photo,
       st.role,
-      COUNT(CASE WHEN c.status <> 'Closed' THEN 1 END) AS active_complaints
+      COUNT(
+        CASE
+          WHEN c.status <> 'Closed' THEN 1
+        END
+      ) AS active_complaints
     FROM staff st
     LEFT JOIN complaints c
       ON c.assigned_staff_id = st.id
     WHERE LOWER(st.role) = LOWER(?)
       AND LOWER(st.status) = 'active'
-    GROUP BY st.id, st.staff_id, st.name, st.email, st.mobile, st.photo, st.role
-    ORDER BY active_complaints ASC, st.id ASC
+    GROUP BY
+      st.id,
+      st.staff_id,
+      st.name,
+      st.email,
+      st.mobile,
+      st.photo,
+      st.role
+    ORDER BY
+      active_complaints ASC,
+      st.id ASC
     LIMIT 1`,
-    [category]
+    [staffRole],
   );
 
   return rows[0] || null;
@@ -146,14 +182,16 @@ const createComplaint = async (req, res) => {
   if (!backupStudentId || !category || !subject || !description) {
     return res.status(400).json({
       success: false,
-      message: "Backup student, category, subject and description are required.",
+      message:
+        "Backup student, category, subject and description are required.",
     });
   }
 
   if (backupStudentId === studentId) {
     return res.status(400).json({
       success: false,
-      message: "Backup student must be different from the complaint-raising student.",
+      message:
+        "Backup student must be different from the complaint-raising student.",
     });
   }
 
@@ -173,40 +211,75 @@ const createComplaint = async (req, res) => {
 
   try {
     const [studentRows] = await db.query(
-      `SELECT id, name, email, mobile, photo, hostel, college, course
+      `SELECT
+        id,
+        name,
+        email,
+        mobile,
+        photo,
+        hostel,
+        college,
+        course
        FROM students
        WHERE id = ?
        LIMIT 1`,
-      [studentId]
+      [studentId],
     );
 
     if (!studentRows.length) {
-      return res.status(404).json({ success: false, message: "Student not found." });
+      return res.status(404).json({
+        success: false,
+        message: "Student not found.",
+      });
     }
 
     const [backupRows] = await db.query(
-      `SELECT id, name, email, mobile, photo, hostel, college, course
+      `SELECT
+        id,
+        name,
+        email,
+        mobile,
+        photo,
+        hostel,
+        college,
+        course
        FROM students
        WHERE id = ?
        LIMIT 1`,
-      [backupStudentId]
+      [backupStudentId],
     );
 
     if (!backupRows.length) {
-      return res.status(404).json({ success: false, message: "Backup student not found." });
+      return res.status(404).json({
+        success: false,
+        message: "Backup student not found.",
+      });
     }
 
     const backup = backupRows[0];
+
     const assignedStaff = await getAvailableStaff(category);
 
     if (!assignedStaff) {
+      const categoryRoleMap = {
+        Electrical: "Electrician",
+        Plumbing: "Plumber",
+        Carpenter: "Carpenter",
+        Cleaning: "Housekeeping",
+        IT: "IT",
+        Maintenance: "Maintenance",
+      };
+
+      const staffRole = categoryRoleMap[category] || category;
+
       return res.status(404).json({
         success: false,
-        message: `No active ${category} staff is available.`,
+        message: `No active ${staffRole} staff is available for ${category} complaints.`,
       });
     }
 
     const complaintCode = generateComplaintCode();
+
     const attachment = req.file
       ? `uploads/complaints/${req.file.filename}`
       : null;
@@ -228,7 +301,8 @@ const createComplaint = async (req, res) => {
         assigned_by_type,
         assigned_at,
         status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
       [
         complaintCode,
         studentId,
@@ -244,28 +318,36 @@ const createComplaint = async (req, res) => {
         assignedStaff.id,
         "Staff",
         "Assigned",
-      ]
+      ],
     );
 
     return res.status(201).json({
       success: true,
-      message: "Complaint submitted successfully and staff assigned automatically.",
+      message:
+        "Complaint submitted successfully and staff assigned automatically.",
       complaint: {
         id: result.insertId,
         complaint_code: complaintCode,
         status: "Assigned",
+
         assigned_staff_id: assignedStaff.id,
+        assigned_staff_id_code: assignedStaff.staff_id,
         assigned_staff_name: assignedStaff.name,
+        assigned_staff_email: assignedStaff.email,
         assigned_staff_mobile: assignedStaff.mobile,
         assigned_staff_role: assignedStaff.role,
         assigned_staff_photo: getPhotoUrl(assignedStaff.photo),
+
         backup_student_id: backup.id,
         backup_student_name: backup.name,
         backup_student_email: backup.email,
+        backup_student_mobile: backup.mobile,
+        backup_student_photo: getPhotoUrl(backup.photo),
       },
     });
   } catch (error) {
     console.error("Create Complaint Error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to submit complaint.",
@@ -326,7 +408,7 @@ const getStudentComplaints = async (req, res) => {
       LEFT JOIN students bs ON bs.id = c.backup_student_id
       WHERE c.student_id = ?
       ORDER BY c.created_at DESC`,
-      [requestedStudentId]
+      [requestedStudentId],
     );
 
     return res.json({
@@ -397,7 +479,7 @@ const getComplaintById = async (complaintId, studentId) => {
     LEFT JOIN rooms r ON r.id = ra.room_id
     WHERE c.id = ? AND c.student_id = ?
     LIMIT 1`,
-    [complaintId, studentId]
+    [complaintId, studentId],
   );
 
   return rows[0] || null;
@@ -451,7 +533,7 @@ const createRatingToken = (complaintId, email) => {
       complaintId: Number(complaintId),
       email: String(email).toLowerCase(),
       exp: Date.now() + 30 * 24 * 60 * 60 * 1000,
-    })
+    }),
   ).toString("base64url");
 
   const signature = crypto
@@ -501,21 +583,33 @@ const getComplaintRating = async (req, res) => {
        FROM complaints
        WHERE id = ?
        LIMIT 1`,
-      [data.complaintId]
+      [data.complaintId],
     );
 
     if (!rows.length) {
-      return res.status(404).json({ success: false, message: "Complaint not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Complaint not found." });
     }
 
     const complaint = rows[0];
 
     if (String(complaint.otp_email || "").toLowerCase() !== data.email) {
-      return res.status(403).json({ success: false, message: "Rating link is not valid for this recipient." });
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Rating link is not valid for this recipient.",
+        });
     }
 
     if (complaint.otp_verified !== "Yes") {
-      return res.status(403).json({ success: false, message: "Complaint resolution has not been OTP verified." });
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Complaint resolution has not been OTP verified.",
+        });
     }
 
     return res.json({
@@ -564,17 +658,21 @@ const submitComplaintRating = async (req, res) => {
        FROM complaints
        WHERE id = ?
        LIMIT 1`,
-      [data.complaintId]
+      [data.complaintId],
     );
 
     if (!rows.length) {
-      return res.status(404).json({ success: false, message: "Complaint not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "Complaint not found." });
     }
 
     const complaint = rows[0];
 
     if (String(complaint.otp_email || "").toLowerCase() !== data.email) {
-      return res.status(403).json({ success: false, message: "Rating link is not valid." });
+      return res
+        .status(403)
+        .json({ success: false, message: "Rating link is not valid." });
     }
 
     if (complaint.otp_verified !== "Yes") {
@@ -595,7 +693,7 @@ const submitComplaintRating = async (req, res) => {
       `UPDATE complaints
        SET rating = ?, rating_feedback = ?, rated_at = NOW()
        WHERE id = ?`,
-      [rating, ratingFeedback || null, data.complaintId]
+      [rating, ratingFeedback || null, data.complaintId],
     );
 
     return res.json({

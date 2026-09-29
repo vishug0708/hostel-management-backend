@@ -1,48 +1,59 @@
 const express = require("express");
+
 const {
-  getAssignedComplaints,
-  getComplaintDetail,
-  updateComplaintStatus,
-  setExpectedResolutionDate,
-  addResolutionNote,
-  sendOTPToRecipient,
-  verifyOTPAndClose,
+    getAssignedComplaints,
+    getComplaintDetail,
+    updateComplaintStatus,
+    setExpectedResolutionDate,
+    addResolutionNote,
+    sendOTPToStudent,
+    verifyOTPAndClose
 } = require("../controllers/staffComplaintsController.js");
+
 const authMiddleware = require("../middleware/authMiddleware.js");
 
 const router = express.Router();
 
-router.get("/complaints", authMiddleware, getAssignedComplaints);
-router.get("/complaints/:complaintId", authMiddleware, getComplaintDetail);
+router.get(
+    "/",
+    authMiddleware,
+    getAssignedComplaints
+);
 
-router.put(
-  "/complaints/:complaintId/status",
-  authMiddleware,
-  updateComplaintStatus
+router.get(
+    "/:complaintId",
+    authMiddleware,
+    getComplaintDetail
 );
 
 router.put(
-  "/complaints/:complaintId/expected-date",
-  authMiddleware,
-  setExpectedResolutionDate
+    "/:complaintId/status",
+    authMiddleware,
+    updateComplaintStatus
 );
 
 router.put(
-  "/complaints/:complaintId/resolution-note",
-  authMiddleware,
-  addResolutionNote
+    "/:complaintId/expected-date",
+    authMiddleware,
+    setExpectedResolutionDate
+);
+
+router.put(
+    "/:complaintId/resolution-note",
+    authMiddleware,
+    addResolutionNote
 );
 
 router.post(
-  "/complaints/:complaintId/send-otp",
-  authMiddleware,
-  sendOTPToRecipient
+    "/:complaintId/send-otp",
+    authMiddleware,
+    sendOTPToStudent
 );
 
 router.post(
-  "/complaints/:complaintId/verify-otp",
-  authMiddleware,
-  verifyOTPAndClose
+    "/:complaintId/verify-otp",
+    authMiddleware,
+    verifyOTPAndClose
 );
 
 module.exports = router;

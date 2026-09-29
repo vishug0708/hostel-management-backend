@@ -286,23 +286,21 @@ const createComplaint = async (req, res) => {
 
     const [result] = await db.query(
       `INSERT INTO complaints (
-        complaint_code,
-        student_id,
-        backup_student_id,
-        category,
-        subject,
-        description,
-        attachment,
-        assigned_staff_id,
-        assigned_staff_name,
-        assigned_staff_mobile,
-        assigned_staff_photo,
-        assigned_by_id,
-        assigned_by_type,
-        assigned_at,
-        status
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+    complaint_code,
+    student_id,
+    backup_student_id,
+    category,
+    subject,
+    description,
+    attachment,
+    assigned_staff_id,
+    assigned_staff_name,
+    assigned_staff_mobile,
+    assigned_staff_photo,
+    assigned_at,
+    status
+  )
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
       [
         complaintCode,
         studentId,
@@ -315,8 +313,6 @@ const createComplaint = async (req, res) => {
         assignedStaff.name,
         assignedStaff.mobile,
         getPhotoUrl(assignedStaff.photo),
-        assignedStaff.id,
-        "Staff",
         "Assigned",
       ],
     );
@@ -595,21 +591,17 @@ const getComplaintRating = async (req, res) => {
     const complaint = rows[0];
 
     if (String(complaint.otp_email || "").toLowerCase() !== data.email) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Rating link is not valid for this recipient.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Rating link is not valid for this recipient.",
+      });
     }
 
     if (complaint.otp_verified !== "Yes") {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Complaint resolution has not been OTP verified.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Complaint resolution has not been OTP verified.",
+      });
     }
 
     return res.json({

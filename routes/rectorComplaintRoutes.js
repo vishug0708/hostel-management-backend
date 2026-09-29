@@ -1,24 +1,24 @@
 const express = require("express");
 const {
-    getAllComplaints,
-    getComplaintDetails,
-    getComplaintsByStatus,
-    getComplaintsByCategory,
-    getComplaintStatistics,
-    getStaffPerformance,
-    getStudentComplaints,
-    getPendingResolutions,
-    getOverdueComplaints,
-    getClosedComplaintsWithRatings,
-    exportComplaintReport,
-    getResolutionTimeByCategory,
-    getComplaintsTrend
+  getAllComplaints,
+  getComplaintDetails,
+  getComplaintsByStatus,
+  getComplaintsByCategory,
+  getComplaintStatistics,
+  getStaffPerformance,
+  getStudentComplaints,
+  getPendingResolutions,
+  getOverdueComplaints,
+  getClosedComplaintsWithRatings,
+  exportComplaintReport,
+  getResolutionTimeByCategory,
+  getComplaintsTrend,
 } = require("../controllers/rectorComplaintController.js");
 const authMiddleware = require("../middleware/authMiddleware.js");
 
 const router = express.Router();
 
-// Rector complaint monitoring routes (read-only)
+// Rector is monitoring-only for complaints. No status/OTP/closure mutation routes exist here.
 router.get("/complaints", authMiddleware, getAllComplaints);
 router.get("/complaints/details/:complaintId", authMiddleware, getComplaintDetails);
 router.get("/complaints/status/:status", authMiddleware, getComplaintsByStatus);

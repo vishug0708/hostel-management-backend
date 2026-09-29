@@ -311,16 +311,16 @@ app.use(
 // =====================================================
 // STAFF PROTECTED ROUTES
 // =====================================================
+app.use("/api/staff", staffRoutes);
 
 app.use("/api/staff/auth", staffAuthRoutes);
 
-app.use("/api/staff", staffRoutes);
+app.use("/api/staff/cricket-box", staffCricketRoutes);
+
+app.use("/api/staff/complaints", staffComplaintsRoutes);
 
 app.use("/api/staff/salary", staffSalaryRoutes);
 
-app.use("/api/staff/cricket-box", staffCricketRoutes);
-
-app.use("/api/staff", staffComplaintsRoutes);
 
 // =====================================================
 // SECURITY PROTECTED ROUTES

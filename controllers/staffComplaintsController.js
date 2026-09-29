@@ -159,28 +159,54 @@ const updateComplaintStatus = async (req, res) => {
 
     const transitions = {
       Assigned: "In Progress",
-      "In Progress": "Resolution Pending",
+      "In Progress": "Resolution Pending"
     };
 
-    if (!staffId) return res.status(401).json({ success: false, message: "Staff session not found." });
-    if (!transitions[requestedStatus]) {
+    if (!staffId) {
+      return res.status(401).json({
+        success: false,
+        message: "Staff session not found."
+      });
+    }
+
+    const allowedNextStatuses = Object.values(transitions);
+
+    if (!allowedNextStatuses.includes(requestedStatus)) {
       return res.status(400).json({
         success: false,
-        message: "Staff can move a complaint only from Assigned to In Progress or In Progress to Resolution Pending.",
+        message: "Staff can move a complaint only from Assigned to In Progress or In Progress to Resolution Pending."
+      });
+    }
+
+    if (!complaintId) {
+      return res.status(400).json({
+        success: false,
+        message: "Complaint ID is required."
       });
     }
 
     const [rows] = await db.query(
-      `SELECT status FROM complaints WHERE id = ? AND assigned_staff_id = ? LIMIT 1`,
+      `SELECT status
+       FROM complaints
+       WHERE id = ? AND assigned_staff_id = ?
+       LIMIT 1`,
       [complaintId, staffId]
     );
 
-    if (!rows.length) return res.status(404).json({ success: false, message: "Complaint not found or not assigned to you." });
+    if (!rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Complaint not found or not assigned to you."
+      });
+    }
 
-    if (rows[0].status !== Object.keys(transitions).find((key) => transitions[key] === requestedStatus)) {
+    const currentStatus = rows[0].status;
+    const expectedNextStatus = transitions[currentStatus];
+
+    if (expectedNextStatus !== requestedStatus) {
       return res.status(400).json({
         success: false,
-        message: `Invalid status transition from ${rows[0].status}.`,
+        message: `Invalid status transition from ${currentStatus}.`
       });
     }
 
@@ -191,10 +217,18 @@ const updateComplaintStatus = async (req, res) => {
       [requestedStatus, complaintId, staffId]
     );
 
-    return res.json({ success: true, message: `Complaint moved to ${requestedStatus}.` });
+    return res.json({
+      success: true,
+      message: `Complaint moved to ${requestedStatus}.`
+    });
   } catch (error) {
     console.error("Update Complaint Status Error:", error);
-    return res.status(500).json({ success: false, message: "Failed to update complaint status.", error: error.message });
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update complaint status.",
+      error: error.message
+    });
   }
 };
 

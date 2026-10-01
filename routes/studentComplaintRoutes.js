@@ -8,7 +8,9 @@ const {
     getBackupStudents,
     createComplaint,
     getStudentComplaints,
-    getStudentComplaintDetails
+    getComplaintById,
+    getComplaintRating,
+    submitComplaintRating
 } = require("../controllers/studentComplaintController");
 
 const router = express.Router();
@@ -55,11 +57,35 @@ const upload = multer({
     }
 });
 
+// =====================================================
+// RATING ROUTES
+// IMPORTANT: These routes MUST come before /:studentId
+// No authMiddleware here because rating uses secure token
+// =====================================================
+
+router.get(
+    "/rating/:token",
+    getComplaintRating
+);
+
+router.post(
+    "/rating/:token",
+    submitComplaintRating
+);
+
+// =====================================================
+// BACKUP STUDENTS
+// =====================================================
+
 router.get(
     "/backup-students/:studentId",
     authMiddleware,
     getBackupStudents
 );
+
+// =====================================================
+// CREATE COMPLAINT
+// =====================================================
 
 router.post(
     "/",
@@ -68,16 +94,24 @@ router.post(
     createComplaint
 );
 
+// =====================================================
+// GET STUDENT COMPLAINTS
+// =====================================================
+
 router.get(
     "/:studentId",
     authMiddleware,
     getStudentComplaints
 );
 
+// =====================================================
+// GET SINGLE COMPLAINT DETAILS
+// =====================================================
+
 router.get(
     "/:studentId/:complaintId",
     authMiddleware,
-    getStudentComplaintDetails
+    getComplaintById
 );
 
 module.exports = router;
